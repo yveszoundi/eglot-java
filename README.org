@@ -1,0 +1,40 @@
+#+TITLE: README
+
+* Overview
+This project is a set of functions for Java programming inside [[https://www.gnu.org/software/emacs/][Emacs]], using a Java LSP server such as the [[https://github.com/eclipse/eclipse.jdt.ls][Eclipse JDT Language Server]].
+The implementation leverages [[https://github.com/joaotavora/eglot][eglot]] (and the built-in [[https://github.com/emacs-mirror/emacs/blob/master/lisp/progmodes/project.el][project.el]] library for project management).
+
+
+|---------------------------------+----------------------------------------------------------------|
+| Function                        | Description                                                    |
+|---------------------------------+----------------------------------------------------------------|
+| =eglot-java-project-new-spring= | Wizard for creating Spring projects based on [[https://start.spring.io/][spring initializr]] |
+| =eglot-java-project-new-maven=  | Wizard for creating [[https://maven.apache.org/][Maven]] projects                             |
+| =eglot-java-project-new-gradle= | Wizard for reacting [[https://gradle.org/][Gradle]] projects                            |
+| =eglot-java-file-new=           | Wizard for creating new Java files                             |
+| =eglot-java-run-test=           | Run the current test ([[https://junit.org/junit5/][JUnit]] only is supported)                 |
+| =eglot-java-run-main=           | Run the current main class                                     |
+| =eglot-java-project-task=       | Run a build task using [[https://gradle.org/][Gradle]] or [[https://maven.apache.org/][Maven]] for the project         |
+|---------------------------------+----------------------------------------------------------------|
+
+* Dependencies
+- The only Emacs package dependency is [[https://github.com/joaotavora/eglot][eglot]], with the assumption that you're running a recent enough version of Emacs.
+- You also need to download a recent version of the [[https://projects.eclipse.org/projects/eclipse.jdt.ls/downloads][Eclipse JDT Language server]] (tested with an old version Eclipse Che language server mostly).
+- For running tests, please grab the latest jar for [[https://mvnrepository.com/artifact/org.junit.platform/junit-platform-console-standalone][Junit Platform Console Standalone runner]] and place it in the location of your choice.
+
+* Usage
+
+Add the /eglot-java.el/ file to your [[https://www.emacswiki.org/emacs/LoadPath][load path]] and load /eglot-java/ with the commannd =(progn (require 'eglot-java) (eglot-java-init))= in the minibuffer.
+
+** Customization
+
+Customize default settings to reflect your environment via =M-x customize-group= (/eglot-java/)
+
+** Sample init file lines
+
+#+begin_src elisp
+(eval-after-load 'eglot-java
+  (progn
+    (require 'eglot-java)
+    '(eglot-java-init)))
+#+end_src
