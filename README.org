@@ -14,7 +14,7 @@ The implementation leverages [[https://github.com/joaotavora/eglot][eglot]] (and
 | =eglot-java-file-new=           | Wizard for creating new Java files                             |
 | =eglot-java-run-test=           | Run the current test ([[https://junit.org/junit5/][JUnit]] only is supported)                 |
 | =eglot-java-run-main=           | Run the current main class                                     |
-| =eglot-java-project-task=       | Run a build task using [[https://gradle.org/][Gradle]] or [[https://maven.apache.org/][Maven]] for the project         |
+| =eglot-java-build-task=         | Run a build task using [[https://gradle.org/][Gradle]] or [[https://maven.apache.org/][Maven]] for the project         |
 |---------------------------------+----------------------------------------------------------------|
 
 * Dependencies
@@ -28,7 +28,9 @@ Add the /eglot-java.el/ file to your [[https://www.emacswiki.org/emacs/LoadPath]
 
 ** Customization
 
-Customize default settings to reflect your environment via =M-x customize-group= (/eglot-java/)
+You need to customize few settings to reflect your environment via =M-x customize-group= (/eglot-java/): LSP server installation folder, etc.
+- The default =java-mode= keybindings are controlled by the custom variable =eglot-java-default-bindings-enabled= and the prefix key variable =eglot-java-prefix-key= (=C-c l=). 
+- You can inspect all the pre-defined keybindings applied to the =java-mode= by typing =C-c l C-h=, after opening a Java file.
 
 ** Sample init file lines
 
