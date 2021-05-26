@@ -99,6 +99,7 @@ Otherwise returns nil"
   (cdr project))
 
 (defun eglot-java--find-equinox-launcher ()
+  "Find the equinox jar launcher in the LSP plugins directory."
   (let* ((lsp-java-server-plugins-dir (concat
                                        (file-name-as-directory
                                         (expand-file-name eglot-java-server-install-dir))
@@ -110,7 +111,6 @@ Otherwise returns nil"
     (expand-file-name equinox-launcher-jar
                       lsp-java-server-plugins-dir)))
 
-
 (defun eglot-java--eclipse-contact (interactive)
   (let ((cp (getenv "CLASSPATH")))
     (setenv "CLASSPATH" (concat cp path-separator (eglot-java--find-equinox-launcher)))
@@ -118,22 +118,23 @@ Otherwise returns nil"
         (eglot--eclipse-jdt-contact nil)
       (setenv "CLASSPATH" cp))))
 
-(defun eglot-java--eclipse-project-name-maven (root)
+(defun eglot-java--project-name-maven (root)
+  "Return the name of a Maven project in the folder ROOT.
+This extracts the project name from the Maven POM (artifactId)."
   (let* ((pom (expand-file-name "pom.xml" root))
          (xml (xml-parse-file pom))
          (parent (car xml)))
     (car (last (car (mapcar 'identity (xml-get-children parent 'artifactId)))))))
 
 (defun eglot-java--project-gradle-p (root)
+  "Check if a project stored in the folder ROOT is using Gradle as build tool."
   (file-exists-p (expand-file-name "build.gradle"
                                    (file-name-as-directory root)) ))
 
-(defun eglot-java--project-name (root)
-  (if (eglot-java--project-gradle-p root)
-      (eglot-java--eclipse-project-name-gradle root)
-    (eglot-java--eclipse-project-name-maven root)))
-
-(defun eglot-java--eclipse-project-name-gradle (root)
+(defun eglot-java--project-name-gradle (root)
+  "Return the name of a Gradle project in the folder ROOT.
+If a settings.gradle file exists, it'll be parsed to extract the project name.
+Otherwise the basename of the folder ROOT will be returned."
   (let ((build-file (expand-file-name "settings.gradle" root)))
     (if (file-exists-p build-file)
         (let* ((build           (expand-file-name "settings.gradle" root))
@@ -153,10 +154,18 @@ Otherwise returns nil"
              gradle-settings))))
       (file-name-nondirectory (directory-file-name (file-name-directory build-file))))))
 
+(defun eglot-java--project-name (root)
+  "Return the Java project name stored in a given folder ROOT."
+  (if (eglot-java--project-gradle-p root)
+      (eglot-java--project-name-gradle root)
+    (eglot-java--project-name-maven root)))
 
 (defun eglot-java--eclipse-classpath (fqcn prj-name)
+  "Return the classpath for a given class FQCN within a project PRJ-NAME."
   (let ((json-result (eglot-execute-command
-                      (eglot--current-server-or-lose) "vscode.java.resolveClasspath" (vector fqcn  prj-name))))
+                      (eglot--current-server-or-lose)
+                      "vscode.java.resolveClasspath"
+                      (vector fqcn  prj-name))))
     (if (and json-result (> (length json-result) 0))
         (apply 'nconc (remove nil
                               (mapcar (lambda (e)
@@ -164,6 +173,7 @@ Otherwise returns nil"
                                       (mapcar 'identity json-result)))))))
 
 (defun eglot-java--eclipse-fqcn-main ()
+  "Resolve the current main class and validate it before returning it."
   (let* ((main-class-vec (eglot-execute-command
                           (eglot--current-server-or-lose)
                           "vscode.java.resolveMainClass" (list)))
@@ -172,27 +182,17 @@ Otherwise returns nil"
          (selected
           (car
            (cl-remove-if-not (lambda (e)
-                               (string= (plist-get e :filePath) current-file)) main-class-list))))
+                               (string= (plist-get e :filePath)
+                                        current-file))
+                             main-class-list))))
     (when selected
       (plist-get selected :mainClass))))
-
-(defun eglot-java--make-path (root-dir &rest path-elements)
-  (let ((new-path          (expand-file-name (if (listp root-dir)
-                                                 (car root-dir)
-                                               root-dir)))
-        (new-path-elements (if (listp root-dir)
-                               (rest root-dir)
-                             path-elements)))
-    (dolist (p new-path-elements)
-      (setq new-path (concat (file-name-as-directory new-path) p)))
-    new-path))
-
 
 (defun eglot-java-file-new ()
   "Create a new class."
   (interactive)
   (let* ((class-by-type     #s(hash-table
-                               size 4
+                               size 5
                                test equal
                                data ("Class"      "public class %s {\n\n}"
                                      "Enum"       "public enum %s {\n\n}"
@@ -238,9 +238,10 @@ import org.junit.jupiter.api.Test;\n\npublic class %s {\n\n}")))
     (insert (format (gethash class-type class-by-type)
                     simple-class-name))
 
-  (save-buffer)))
+    (save-buffer)))
 
 (defun eglot-java-run-test ()
+  "Run a test class."
   (interactive)
   (let* ((fqcn     (eglot-java--eclipse-fqcn))
          (prj-root (cdr (project-current)))
@@ -262,6 +263,7 @@ import org.junit.jupiter.api.Test;\n\npublic class %s {\n\n}")))
       (user-error "No test found in this file!"))))
 
 (defun eglot-java-run-main ()
+  "Run a main class."
   (interactive)
   (let* ((fqcn     (eglot-java--eclipse-fqcn-main))
          (prj-root (cdr (project-current)))
@@ -277,6 +279,7 @@ import org.junit.jupiter.api.Test;\n\npublic class %s {\n\n}")))
       (user-error "No main method found in this file!"))))
 
 (defun eglot-java--eclipse-fqcn ()
+  "Return the fully qualified name of a given class."
   (let* ((document-symbols (eglot-java--document-symbols))
          (package-name (eglot-java--symbol-value document-symbols "Package"))
          (class-name (eglot-java--symbol-value document-symbols "Class"))
@@ -286,6 +289,8 @@ import org.junit.jupiter.api.Test;\n\npublic class %s {\n\n}")))
     (format "%s%s%s" package-name package-suffix class-name)))
 
 (defun eglot-java--symbol-value (symbols symbol-type)
+  "Extract the symbol value for a given SYMBOL-TYPE
+from a symbol table SYMBOLS."
   (let ((symbol-details (cl-find-if
                          (lambda (elem)
                            (let* ((elem-kind (plist-get elem :kind))
@@ -297,11 +302,13 @@ import org.junit.jupiter.api.Test;\n\npublic class %s {\n\n}")))
       "")))
 
 (defun eglot-java--document-symbols ()
+  "Fetch the document symbols/tokens."
   (jsonrpc-request
    (eglot--current-server-or-lose) :textDocument/documentSymbol
    (list :textDocument (list :uri (eglot--path-to-uri (buffer-file-name))))))
 
 (defun eglot-project-build ()
+  "Build the project when Maven or Gradle build files are found."
   (interactive)
   (let* ((root (cdr (project-current)))
          (build-file (if (eglot-java--project-gradle-p root)
@@ -316,7 +323,7 @@ import org.junit.jupiter.api.Test;\n\npublic class %s {\n\n}")))
         (jsonrpc-notify
          (eglot--current-server-or-lose)
          :java/buildWorkspace
-         '((:json-false )))))))
+         '((:json-false)))))))
 
 (defun eglot-java--kbd (key)
   (kbd (concat eglot-java-prefix-key " " key)))
@@ -337,7 +344,7 @@ import org.junit.jupiter.api.Test;\n\npublic class %s {\n\n}")))
       (yas-minor-mode 1))))
 
 (defun eglot-java--spring-initializr-fetch-json (url)
-  "Send ARGS to URL as a POST request."
+  "Retrieve the Spring initializr JSON model from a given URL."
   (require 'url)
   (let ((url-request-method "GET")
         (url-request-extra-headers
@@ -363,6 +370,7 @@ import org.junit.jupiter.api.Test;\n\npublic class %s {\n\n}")))
     (kill-buffer)))
 
 (defun eglot-java--buffer-whole-string (buffer)
+  "Retrieve the text contents from an HTTP response BUFFER."
   (with-current-buffer buffer
     (save-restriction
       (widen)
@@ -370,9 +378,11 @@ import org.junit.jupiter.api.Test;\n\npublic class %s {\n\n}")))
       (buffer-substring-no-properties (point) (point-max)))))
 
 (defun eglot-java--spring-read-json ()
+  "Fetch the JSON model for creating Spring projects via spring initializr."
   (eglot-java--spring-initializr-fetch-json eglot-java-spring-starter-url-projectdef))
 
 (defun eglot-java-project-new-spring ()
+  "Create a new Spring java project using spring initializr."
   (interactive)
   (when (not eglot-java-spring-starter-jsontext)
     (eglot-java--spring-read-json))
@@ -384,19 +394,23 @@ import org.junit.jupiter.api.Test;\n\npublic class %s {\n\n}")))
          (simple-params (mapcar
                          (lambda (p)
                            (let ( (elem-type (gethash "type" (gethash p eglot-java-spring-starter-jsontext))) )
-                             (cond ((or (string= "single-select" elem-type) (string= "action" elem-type))
+                             (cond ((or (string= "single-select" elem-type)
+                                        (string= "action" elem-type))
                                     (format "%s=%s" p
                                             (completing-read
                                              (format "Select %s: " p)
                                              (mapcar
                                               (lambda (f)
                                                 (gethash "id" f))
-                                              (gethash "values" (gethash p eglot-java-spring-starter-jsontext)))
-                                             nil t (gethash "default" (gethash p eglot-java-spring-starter-jsontext)))))
+                                              (gethash "values" (gethash p
+                                                                         eglot-java-spring-starter-jsontext)))
+                                             nil t (gethash "default" (gethash p
+                                                                               eglot-java-spring-starter-jsontext)))))
                                    ((string= "text" elem-type)
                                     (format "%s=%s" p
                                             (read-string (format "Select %s: " p)
-                                                         (gethash "default" (gethash p eglot-java-spring-starter-jsontext))))))))
+                                                         (gethash "default" (gethash p
+                                                                                     eglot-java-spring-starter-jsontext))))))))
                          elems))
          (simple-deps   (completing-read-multiple "Select dependencies: "
                                                   (apply 'nconc
@@ -409,15 +423,17 @@ import org.junit.jupiter.api.Test;\n\npublic class %s {\n\n}")))
                                                           (mapcar
                                                            (lambda (x)
                                                              (gethash "values" x))
-                                                           (gethash "values"  (gethash "dependencies" eglot-java-spring-starter-jsontext )))))))
-         (dest-dir     (read-directory-name "Project directory: " (eglot-java--make-path eglot-java-workspace-folder project-name))))
+                                                           (gethash "values"  (gethash "dependencies" e
+                                                                                       glot-java-spring-starter-jsontext )))))))
+         (dest-dir     (read-directory-name "Project directory: "
+                                            (expand-file-name project-name eglot-java-workspace-folder))))
 
     (unless (file-exists-p dest-dir)
       (make-directory dest-dir t))
 
     (let ((large-file-warning-threshold nil)
-          (dest-file-name (eglot-java--make-path dest-dir
-                                                 (concat (format-time-string "%Y-%m-%d_%N") ".zip"))))
+          (dest-file-name (expand-file-name (concat (format-time-string "%Y-%m-%d_%N") ".zip")
+                                            dest-dir)))
       (url-copy-file
        (concat
         eglot-java-spring-starter-url-starterzip
@@ -431,15 +447,20 @@ import org.junit.jupiter.api.Test;\n\npublic class %s {\n\n}")))
        t)
 
       (dired (file-name-directory dest-file-name))
-      
+
       (revert-buffer))))
 
 (defun eglot-java--build-run (initial-dir cmd args)
+  "Start a compilation from a direction INITIAL-DIR
+with a given command string CMD
+and its arguments string ARGS."
   (let ((mvn-cmd           (concat cmd " " args))
         (default-directory initial-dir))
     (compile mvn-cmd t)))
 
 (defun eglot-java--build-executable(cmd cmd-wrapper-name cmd-wrapper-dir)
+  "Returns the command to run, either the initial command itself CMD
+or its wrapper equivalent (CMD-WRAPPER-NAME) if found in CMD-WRAPPER-DIR."
   (let ((cmd-wrapper-abspath (executable-find (expand-file-name
                                                cmd-wrapper-name
                                                cmd-wrapper-dir))))
@@ -448,7 +469,8 @@ import org.junit.jupiter.api.Test;\n\npublic class %s {\n\n}")))
         cmd-wrapper-abspath
       cmd)))
 
-(defun eglot-java-project-task ()
+(defun eglot-java-build-task ()
+  "Run a new build task."
   (interactive)
   (let* ((project-dir (cdr (project-current)))
          (goal (read-string "Task & Parameters: " "test"))
@@ -470,6 +492,7 @@ import org.junit.jupiter.api.Test;\n\npublic class %s {\n\n}")))
                           goal))))
 
 (defun eglot-java-project-new-maven ()
+  "Create a new Maven project."
   (interactive)
   (let ((mvn-project-parent-dir     (read-directory-name "Enter parent directory: "))
         (mvn-group-id               (read-string         "Enter group id: "))
@@ -489,36 +512,33 @@ import org.junit.jupiter.api.Test;\n\npublic class %s {\n\n}")))
       (let ((dest-dir (expand-file-name mvn-artifact-id mvn-project-parent-dir))
             (p (get-buffer-process b)))
         (with-current-buffer b
-          (message "folder is %s" dest-dir)
           (setq eglot-java-project-new-directory dest-dir ))
 
         (set-process-sentinel p 'eglot-java--project-new-process-sentinel)))))
 
 (defun eglot-java-project-new-gradle ()
+  "Create a new Gradle project."
   (interactive)
   (let* ((gradle-project-parent-dir (read-directory-name "Enter parent directory:"))
          (gradle-project-name       (read-string         "Enter project name (no spaces): "))
+         (init-dsls                 '("groovy" "kotlin"))
+         (init-types                '("java-application" "java-library" "java-gradle-plugin" "basic"))
+         (init-test-frameworks      '("junit-jupiter" "spock" "testng"))                                    
          (init-dsl                  (completing-read "Select init DSL: "
-                                                     '("kotlin"
-                                                       "groovy")
+                                                     init-dsls
                                                      nil
                                                      t
-                                                     "groovy"))
+                                                     (car init-dsls))
          (init-type                 (completing-read "Select init type: "
-                                                     '("java-application"
-                                                       "java-library"
-                                                       "java-gradle-plugin"
-                                                       "basic")
+                                                     init-types
                                                      nil
                                                      t
-                                                     "java-application"))
+                                                     (car init-types)))
          (init-test-framework       (completing-read "Select test framework: "
-                                                     '("junit-jupiter"
-                                                       "spock"
-                                                       "testng")
+                                                     init-test-frameworks                                                     
                                                      nil
                                                      t
-                                                     "junit-jupiter"))
+                                                     (car init-test-frameworks))
          (dest-dir                  (expand-file-name gradle-project-name gradle-project-parent-dir)))
 
     (unless (file-exists-p dest-dir)
