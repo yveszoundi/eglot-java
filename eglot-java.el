@@ -194,11 +194,12 @@ Otherwise returns nil"
   (let* ((class-by-type     #s(hash-table
                                size 4
                                test equal
-                               data ("Class"      "cls"
-                                     "Enum"       "en"
-                                     "Interface"  "ifc"
-                                     "Annotation" "ann"
-                                     "Test"       "test")))
+                               data ("Class"      "public class %s {\n\n}"
+                                     "Enum"       "public enum %s {\n\n}"
+                                     "Interface"  "public interface %s {\n\n}"
+                                     "Annotation" "public @interface %s {\n\n}"
+                                     "Test"       "import org.junit.jupiter.api.Assertions;\n
+import org.junit.jupiter.api.Test;\n\npublic class %s {\n\n}")))
          (source-list       (eglot-execute-command
                              (eglot--current-server-or-lose)
                              "java.project.listSourcePaths" (list)))
@@ -234,12 +235,10 @@ Otherwise returns nil"
     (when new-paths
       (insert (concat "package " (mapconcat 'identity new-paths ".") ";\n\n")))
 
-    (yas-expand-snippet (gethash class-type class-by-type))
-    (let ((yas-fallback-behavior 'return-nil)) (yas-expand))
-    (forward-line +1)
-    (indent-according-to-mode))
+    (insert (format (gethash class-type class-by-type)
+                    simple-class-name))
 
-  (save-buffer))
+  (save-buffer)))
 
 (defun eglot-java-run-test ()
   (interactive)
