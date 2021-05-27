@@ -39,7 +39,7 @@
   :group 'applications)
 
 (defcustom eglot-java-server-install-dir "~/.emacs.d/share/ls-jdt"
-  "Location of the Java language server"
+  "Location of the Eclipse Java language server installation"
   :type 'directory
   :group 'eglot-java)
 
@@ -74,7 +74,7 @@
   :group 'eglot-java)
 
 (defcustom eglot-java-default-bindings-enabled t
-  "Enable default prefix key bindings in java-mode"
+  "Enable default keybindings in java-mode"
   :type 'boolean
   :group 'eglot-java)
 
@@ -528,7 +528,7 @@ or its wrapper equivalent (CMD-WRAPPER-NAME) if found in CMD-WRAPPER-DIR."
                                                      init-dsls
                                                      nil
                                                      t
-                                                     (car init-dsls))
+                                                     (car init-dsls)))
          (init-type                 (completing-read "Select init type: "
                                                      init-types
                                                      nil
@@ -538,7 +538,7 @@ or its wrapper equivalent (CMD-WRAPPER-NAME) if found in CMD-WRAPPER-DIR."
                                                      init-test-frameworks                                                     
                                                      nil
                                                      t
-                                                     (car init-test-frameworks))
+                                                     (car init-test-frameworks)))
          (dest-dir                  (expand-file-name gradle-project-name gradle-project-parent-dir)))
 
     (unless (file-exists-p dest-dir)
