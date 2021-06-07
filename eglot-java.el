@@ -36,15 +36,26 @@
 (defgroup eglot-java nil
   "Interaction with a Java language server via eglot."
   :prefix "eglot-java-"
-  :group 'applications)
+  :group 'eglot)
 
-(defcustom eglot-java-server-install-dir "~/.emacs.d/share/ls-jdt"
-  "Location of the Eclipse Java language server installation"
-  :type 'directory
+(defcustom eglot-java-eclipse-jdt-ls-download-url "https://download.eclipse.org/jdtls/snapshots/jdt-language-server-latest.tar.gz"
+  "URL to download the latest Eclipse JDT language server."
+  :type 'string
   :group 'eglot-java)
 
-(defcustom junit-platform-console-standalone-jar
-  "~/.emacs.d/share/ls-jdt/test-runner/junit-platform-console-standalone-1.3.0-M1.jar"
+(defcustom eglot-java-junit-platform-console-standalone-jar-url "http://repository.sonatype.org/service/local/artifact/maven/redirect?r=central-proxy&g=org.junit.platform&a=junit-platform-console-standalone&v=LATEST"
+  "URL to download the latest JUnit platform standalone console jar."
+  :type 'string
+  :group 'eglot-java)
+
+(defcustom eglot-java-server-install-dir "~/.emacs.d/share/eclipse.jdt.ls"
+  "Location of the Eclipse Java language server installation"
+  :type 'directory
+  :group 'eglot-java
+  :link '(url-link :tag "Github" "https://github.com/yveszoundi/eglot-java"))
+
+(defcustom eglot-java-junit-platform-console-standalone-jar
+  "~/.emacs.d/share/junit-platform-console-standalone/junit-platform-console-standalone.jar"
   "Location of the vscode test runner"
   :type 'file
   :group 'eglot-java)
@@ -87,8 +98,17 @@
 
 (make-variable-buffer-local 'eglot-java-project-new-directory)
 
+(defun eglot-java--download-file (source-url dest-location)
+  "Download a file from a URL at SOURCE-URL and save it to file at DEST-LOCATION."
+  (let* ((dest-dir     (file-name-directory dest-location))
+         (dest-abspath (expand-file-name dest-location)))
+    (unless (file-exists-p dest-dir)
+      (make-directory dest-dir t))
+    (message "Downloading %s\n to %s." source-url dest-abspath)
+    (url-copy-file  source-url dest-abspath t)))
+
 (defun eglot-java--project-try (dir)
-  "Return project instance if DIR is part of a julia project.
+  "Return project instance if DIR is part of a Java project.
 Otherwise returns nil"
   (let ((root (or (locate-dominating-file dir "pom.xml")
                   (locate-dominating-file dir ".project")
@@ -113,6 +133,8 @@ Otherwise returns nil"
 
 (defun eglot-java--eclipse-contact (interactive)
   (let ((cp (getenv "CLASSPATH")))
+    (unless (file-exists-p (expand-file-name eglot-java-server-install-dir))
+      (eglot-java--install-lsp-server))
     (setenv "CLASSPATH" (concat cp path-separator (eglot-java--find-equinox-launcher)))
     (unwind-protect
         (eglot--eclipse-jdt-contact nil)
@@ -121,8 +143,8 @@ Otherwise returns nil"
 (defun eglot-java--project-name-maven (root)
   "Return the name of a Maven project in the folder ROOT.
 This extracts the project name from the Maven POM (artifactId)."
-  (let* ((pom (expand-file-name "pom.xml" root))
-         (xml (xml-parse-file pom))
+  (let* ((pom    (expand-file-name "pom.xml" root))
+         (xml    (xml-parse-file pom))
          (parent (car xml)))
     (car (last (car (mapcar 'identity (xml-get-children parent 'artifactId)))))))
 
@@ -231,23 +253,26 @@ import org.junit.jupiter.api.Test;\n\npublic class %s {\n\n}")))
 (defun eglot-java-run-test ()
   "Run a test class."
   (interactive)
-  (let* ((fqcn     (eglot-java--class-fqcn))
-         (prj-root (cdr (project-current)))
-         (prj-name (eglot-java--project-name prj-root))
-         (cp       (eglot-java--project-classpath (buffer-file-name) "test"))
-         (current-file-is-test (eglot-java--file--test-p (buffer-file-name))))
+  (let* ((fqcn                 (eglot-java--class-fqcn))
+         (prj-root             (cdr (project-current)))
+         (prj-name             (eglot-java--project-name prj-root))
+         (cp                   (eglot-java--project-classpath (buffer-file-name) "test"))
+         (current-file-is-test (not (equal ':json-false (eglot-java--file--test-p (buffer-file-name))))))
+
+    (unless (file-exists-p eglot-java-junit-platform-console-standalone-jar)
+      (eglot-java--download-file eglot-java-junit-platform-console-standalone-jar-url eglot-java-junit-platform-console-standalone-jar))
+
     (if current-file-is-test
         (compile
          (concat "java -jar "
-                 junit-platform-console-standalone-jar
+                 eglot-java-junit-platform-console-standalone-jar
                  (if (string-match-p "#" fqcn)
                      " -m "
                    " -c ")
                  fqcn
                  " -class-path "
                  (mapconcat 'identity cp path-separator)
-                 " "
-                 fqcn)
+                 " ")
          t)
       (user-error "No test found in file \"%s\"!" (buffer-file-name)))))
 
@@ -270,11 +295,11 @@ import org.junit.jupiter.api.Test;\n\npublic class %s {\n\n}")))
 (defun eglot-java--class-fqcn ()
   "Return the fully qualified name of a given class."
   (let* ((document-symbols (eglot-java--document-symbols))
-         (package-name (eglot-java--symbol-value document-symbols "Package"))
-         (class-name (eglot-java--symbol-value document-symbols "Class"))
-         (package-suffix (if (string= "" package-name)
-                             ""
-                           ".")))
+         (package-name     (eglot-java--symbol-value document-symbols "Package"))
+         (class-name       (eglot-java--symbol-value document-symbols "Class"))
+         (package-suffix   (if (string= "" package-name)
+                               package-name
+                             ".")))
     (format "%s%s%s" package-name package-suffix class-name)))
 
 (defun eglot-java--symbol-value (symbols symbol-type)
@@ -302,11 +327,12 @@ from a symbol table SYMBOLS."
 (defun eglot-java--setup ()
   (when (and eglot-java-default-bindings-enabled
              (derived-mode-p 'java-mode))
-    (define-key java-mode-map (eglot-java--kbd "r") #'eglot-rename)
     (define-key java-mode-map (eglot-java--kbd "n") #'eglot-java-file-new)
     (define-key java-mode-map (eglot-java--kbd "x") #'eglot-java-run-main)
     (define-key java-mode-map (eglot-java--kbd "t") #'eglot-java-run-test)
-    (define-key java-mode-map (eglot-java--kbd "h") #'eglot-help-at-point)))
+    (define-key java-mode-map (eglot-java--kbd "N") #'eglot-java-project-new)
+    (define-key java-mode-map (eglot-java--kbd "T") #'eglot-java-project-build-task)
+    (define-key java-mode-map (eglot-java--kbd "R") #'eglot-java-project-build-refresh)))
 
 (defun eglot-java--spring-initializr-fetch-json (url)
   "Retrieve the Spring initializr JSON model from a given URL."
@@ -346,9 +372,13 @@ from a symbol table SYMBOLS."
   "Fetch the JSON model for creating Spring projects via spring initializr."
   (eglot-java--spring-initializr-fetch-json eglot-java-spring-starter-url-projectdef))
 
-(defun eglot-java-project-new-maven ()
-  "Create a new Maven project."
+(defun eglot-java-project-new ()
   (interactive)
+  (let ((project-type (completing-read "Project Type: " '("spring" "maven" "gradle") nil t "spring")))
+    (funcall (intern (concat "eglot-java--project-new-" project-type)))))
+
+(defun eglot-java--project-new-maven ()
+  "Create a new Maven project."
   (let ((mvn-project-parent-dir     (read-directory-name "Enter parent directory: "))
         (mvn-group-id               (read-string         "Enter group id: "))
         (mvn-artifact-id            (read-string         "Enter artifact id: "))
@@ -365,15 +395,14 @@ from a symbol table SYMBOLS."
                     " -DinteractiveMode=false"))))
 
       (let ((dest-dir (expand-file-name mvn-artifact-id mvn-project-parent-dir))
-            (p (get-buffer-process b)))
+            (p        (get-buffer-process b)))
         (with-current-buffer b
-          (setq eglot-java-project-new-directory dest-dir ))
+          (setq eglot-java-project-new-directory dest-dir))
 
         (set-process-sentinel p 'eglot-java--project-new-process-sentinel)))))
 
-(defun eglot-java-project-new-gradle ()
+(defun eglot-java--project-new-gradle ()
   "Create a new Gradle project."
-  (interactive)
   (let* ((gradle-project-parent-dir (read-directory-name "Enter parent directory:"))
          (gradle-project-name       (read-string         "Enter project name (no spaces): "))
          (init-dsls                 '("groovy" "kotlin"))
@@ -412,11 +441,15 @@ from a symbol table SYMBOLS."
 
       (set-process-sentinel (get-buffer-process b) 'eglot-java--project-new-process-sentinel))))
 
-(defun eglot-java-project-new-spring ()
+(defun eglot-java--project-new-spring ()
   "Create a new Spring java project using spring initializr."
-  (interactive)
-  (when (not eglot-java-spring-starter-jsontext)
-    (eglot-java--spring-read-json))
+  ;;(interactive)
+  (unless eglot-java-spring-starter-jsontext
+    (eglot-java--spring-read-json)
+    (while (not eglot-java-spring-starter-jsontext)
+      (sleep-for 1)
+      (message "Downloading spring initializr JSON data...")))
+
   (let* ((elems         (cl-remove-if
                          (lambda (node-name)
                            (member node-name eglot-java-spring-io-excluded-input-params))
@@ -443,7 +476,7 @@ from a symbol table SYMBOLS."
                                                          (gethash "default" (gethash p
                                                                                      eglot-java-spring-starter-jsontext))))))))
                          elems))
-         (simple-deps   (completing-read-multiple "Select dependencies: "
+         (simple-deps   (completing-read-multiple "Select dependencies (comma separated): "
                                                   (apply 'nconc
                                                          (mapcar
                                                           (lambda (s)
@@ -454,8 +487,7 @@ from a symbol table SYMBOLS."
                                                           (mapcar
                                                            (lambda (x)
                                                              (gethash "values" x))
-                                                           (gethash "values"  (gethash "dependencies" e
-                                                                                       glot-java-spring-starter-jsontext )))))))
+                                                           (gethash "values"  (gethash "dependencies" eglot-java-spring-starter-jsontext )))))))
          (dest-dir     (read-directory-name "Project directory: "
                                             (expand-file-name project-name eglot-java-workspace-folder))))
 
@@ -546,14 +578,31 @@ or its wrapper equivalent (CMD-WRAPPER-NAME) if found in CMD-WRAPPER-DIR."
                            (expand-file-name build-filename project-dir))
                           goal))))
 
+(defun eglot-java--install-lsp-server ()
+  "Install the Eclipse JDT LSP server."
+  (let* ((dest-dir                     (expand-file-name eglot-java-server-install-dir))
+         (download-url                 eglot-java-eclipse-jdt-ls-download-url)
+         (dest-filename                (file-name-nondirectory download-url))
+         (dest-abspath                 (expand-file-name dest-filename dest-dir))
+         (large-file-warning-threshold nil))
+    (message "Installing Eclipse JDT LSP server.")
+    (eglot-java--download-file download-url dest-abspath)
+    (with-temp-buffer
+      (let ((b (find-file dest-abspath)))
+        (beginning-of-buffer)
+        (tar-untar-buffer)
+        (kill-buffer b)))
+    (delete-file dest-abspath)
+    (message "Eclipse JDT LSP server installed in folder %s." dest-dir)))
+
 ;;;###autoload
 (defun eglot-java-init ()
-  "Load `eglot-java' to use eglot with the Java JDT language server."
+  "Initialize the library for use with the Eclipse JDT language server."
   (interactive)
-  (add-hook 'project-find-functions #'eglot-java--project-try)
   (setcdr   (assq 'java-mode eglot-server-programs) #'eglot-java--eclipse-contact)
-  (add-hook 'eglot-managed-mode-hook 'eglot-java--setup)
-  (add-hook 'java-mode-hook 'eglot-ensure))
+  (add-hook 'project-find-functions  #'eglot-java--project-try)
+  (add-hook 'eglot-managed-mode-hook #'eglot-java--setup)
+  (add-hook 'java-mode-hook          #'eglot-ensure))
 
 (provide 'eglot-java)
 ;;; eglot-java.el ends here
