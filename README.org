@@ -1,29 +1,24 @@
 #+TITLE: README
 
 * Overview
-This project is a set of functions for Java programming inside [[https://www.gnu.org/software/emacs/][Emacs]], using a Java LSP server such as the [[https://github.com/eclipse/eclipse.jdt.ls][Eclipse JDT Language Server]].
-The implementation leverages [[https://github.com/joaotavora/eglot][eglot]] (and the built-in [[https://github.com/emacs-mirror/emacs/blob/master/lisp/progmodes/project.el][project.el]] library for project management).
+This project is a set of functions for Java programming inside [[https://www.gnu.org/software/emacs/][Emacs]], using the [[https://github.com/eclipse/eclipse.jdt.ls][Eclipse JDT Language Server]].
+The implementation leverages [[https://github.com/joaotavora/eglot][eglot]] (and its transient dependency [[https://github.com/emacs-mirror/emacs/blob/master/lisp/progmodes/project.el][project.el]] for project management).
 
-
-|------------------------------------+----------------------------------------------------------------|
-| Function                           | Description                                                    |
-|------------------------------------+----------------------------------------------------------------|
-| =eglot-java-project-new-spring=    | Wizard for creating Spring projects based on [[https://start.spring.io/][spring initializr]] |
-| =eglot-java-project-new-maven=     | Wizard for creating [[https://maven.apache.org/][Maven]] projects                             |
-| =eglot-java-project-new-gradle=    | Wizard for reacting [[https://gradle.org/][Gradle]] projects                            |
-| =eglot-java-file-new=              | Wizard for creating new Java files                             |
-| =eglot-java-project-build-refresh= | Rebuild the project                                            |
-| =eglot-java-project-build-task=    | Run a build task using [[https://gradle.org/][Gradle]] or [[https://maven.apache.org/][Maven]] for the project         |
-| =eglot-java-run-test=              | Run the current test ([[https://junit.org/junit5/][JUnit]] only is supported)                 |
-| =eglot-java-run-main=              | Run the current main class                                     |
-|------------------------------------+----------------------------------------------------------------|
+|------------------------------------+-------------------------------------------------------------------------|
+| Function                           | Description                                                             |
+|------------------------------------+-------------------------------------------------------------------------|
+| =eglot-java-project-new=           | Create new projects ([[https://start.spring.io/][spring]], [[https://maven.apache.org/][Maven]] or [[https://gradle.org/][Gradle]] projects)                  |
+| =eglot-java-project-build-refresh= | Rebuild the project                                                     |
+| =eglot-java-project-build-task=    | Run a build task using [[https://gradle.org/][Gradle]] or [[https://maven.apache.org/][Maven]] for the project                  |
+| =eglot-java-file-new=              | Wizard for creating new Java files                                      |
+| =eglot-java-run-main=              | Run the current main class                                              |
+| =eglot-java-run-test=              | Run the current test ([[https://junit.org/junit5/][JUnit]] only, unless you run Maven or Gradle tasks) |
+|------------------------------------+-------------------------------------------------------------------------|
 
 * Dependencies
 - The only Emacs package dependency is [[https://github.com/joaotavora/eglot][eglot]], with the assumption that you're running a recent enough version of Emacs.
-- You also need to download a recent version of the [[https://projects.eclipse.org/projects/eclipse.jdt.ls/downloads][Eclipse JDT Language server]] (along with a recent JDK installed and JAVA_HOME defined).
-- For running tests, please grab the latest jar for [[https://mvnrepository.com/artifact/org.junit.platform/junit-platform-console-standalone][Junit Platform Console Standalone runner]] and place it at the location of your choice.
-- If using Maven as build tool, it's assumed that it's main executable is added to your [[https://www.tutorialspoint.com/maven/maven_environment_setup.htm][PATH environment variable]].
-- If using Gradle as build tool, it's assumed that it's main executable is added to your [[https://docs.gradle.org/current/userguide/installation.html][PATH environment variable]].
+- The [[https://projects.eclipse.org/projects/eclipse.jdt.ls/downloads][Eclipse JDT Language server]] along with the [[https://mvnrepository.com/artifact/org.junit.platform/junit-platform-console-standalone][JUnit console runner]] are configured to be *automatically installed* when not found at default locations (see =M-x customize-group= /eglot-java/).
+- Please also configure the [[https://www.tutorialspoint.com/maven/maven_environment_setup.htm][PATH environment variable for Maven]] and/or the [[https://docs.gradle.org/current/userguide/installation.html][PATH environment variable for Gradle]].
 
 * Installation
 
@@ -33,13 +28,14 @@ Copy the contents of /eglot-java.el/ to a new Emacs buffer and run the command =
 
 ** Customization
 
-You need to customize few settings to reflect your environment via =M-x customize-group= (/eglot-java/): LSP server installation folder, etc.
+You need to configure few settings to reflect your environment via =M-x customize-group= (/eglot-java/): LSP server installation folder, etc.
 - The default =java-mode= keybindings are controlled by the custom variable =eglot-java-default-bindings-enabled= and the prefix key variable =eglot-java-prefix-key= (=C-c l=). 
 - You can inspect all the pre-defined keybindings applied to the =java-mode= by typing =C-c l C-h=, after opening a Java file.
 
 ** Configuration
 
 Please find below a simple initialization of this package.
+
 #+begin_src elisp
 (eval-after-load 'eglot-java
   (progn
