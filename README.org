@@ -16,9 +16,9 @@ The implementation leverages [[https://github.com/joaotavora/eglot][eglot]] (and
 |------------------------------------+-------------------------------------------------------------------------|
 
 * Dependencies
-- The only Emacs package dependency is [[https://github.com/joaotavora/eglot][eglot]], with the assumption that you're running a recent enough version of Emacs.
+- The only Emacs package dependency is [[https://github.com/joaotavora/eglot][eglot]], assuming you're running a recent Emacs version.
 - The [[https://projects.eclipse.org/projects/eclipse.jdt.ls/downloads][Eclipse JDT Language server]] along with the [[https://mvnrepository.com/artifact/org.junit.platform/junit-platform-console-standalone][JUnit console runner]] are configured to be *automatically installed* when not found at default locations (see =M-x customize-group= /eglot-java/).
-- Please also configure the [[https://www.tutorialspoint.com/maven/maven_environment_setup.htm][PATH environment variable for Maven]] and/or the [[https://docs.gradle.org/current/userguide/installation.html][PATH environment variable for Gradle]].
+- Please also configure the PATH environment variable [[https://www.tutorialspoint.com/maven/maven_environment_setup.htm][for Maven]] and/or  [[https://docs.gradle.org/current/userguide/installation.html][for Gradle]].
 
 * Installation
 
@@ -28,9 +28,7 @@ Copy the contents of /eglot-java.el/ to a new Emacs buffer and run the command =
 
 ** Customization
 
-You need to configure few settings to reflect your environment via =M-x customize-group= (/eglot-java/): LSP server installation folder, etc.
-- The default =java-mode= keybindings are controlled by the custom variable =eglot-java-default-bindings-enabled= and the prefix key variable =eglot-java-prefix-key= (=C-c l=). 
-- You can inspect all the pre-defined keybindings applied to the =java-mode= by typing =C-c l C-h=, after opening a Java file.
+You can configure few settings to reflect your preferences via =M-x customize-group= (/eglot-java/): LSP server installation folder, etc. The default =java-mode= keybindings are controlled by the custom variable =eglot-java-default-bindings-enabled= and the prefix key variable =eglot-java-prefix-key= (=C-c l=).
 
 ** Configuration
 
