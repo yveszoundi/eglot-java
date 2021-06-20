@@ -321,12 +321,12 @@ from a symbol table SYMBOLS."
 (defun eglot-java--setup ()
   (when (and eglot-java-default-bindings-enabled
              (derived-mode-p 'java-mode))
-    (define-key java-mode-map (eglot-java--kbd "n") #'eglot-java-file-new)
-    (define-key java-mode-map (eglot-java--kbd "x") #'eglot-java-run-main)
-    (define-key java-mode-map (eglot-java--kbd "t") #'eglot-java-run-test)
-    (define-key java-mode-map (eglot-java--kbd "N") #'eglot-java-project-new)
-    (define-key java-mode-map (eglot-java--kbd "T") #'eglot-java-project-build-task)
-    (define-key java-mode-map (eglot-java--kbd "R") #'eglot-java-project-build-refresh)))
+    (define-key eglot-mode-map (eglot-java--kbd "n") #'eglot-java-file-new)
+    (define-key eglot-mode-map (eglot-java--kbd "x") #'eglot-java-run-main)
+    (define-key eglot-mode-map (eglot-java--kbd "t") #'eglot-java-run-test)
+    (define-key eglot-mode-map (eglot-java--kbd "N") #'eglot-java-project-new)
+    (define-key eglot-mode-map (eglot-java--kbd "T") #'eglot-java-project-build-task)
+    (define-key eglot-mode-map (eglot-java--kbd "R") #'eglot-java-project-build-refresh)))
 
 (defun eglot-java--spring-initializr-fetch-json (url)
   "Retrieve the Spring initializr JSON model from a given URL."
