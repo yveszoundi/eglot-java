@@ -135,8 +135,6 @@ Otherwise returns nil"
 
 (defun eglot-java--eclipse-contact (interactive)
   (let ((cp (getenv "CLASSPATH")))
-    (unless (file-exists-p (expand-file-name eglot-java-server-install-dir))
-      (eglot-java--install-lsp-server))
     (setenv "CLASSPATH" (concat cp path-separator (eglot-java--find-equinox-launcher)))
     (unwind-protect
         (eglot--eclipse-jdt-contact nil)
@@ -333,16 +331,14 @@ from a symbol table SYMBOLS."
 (defun eglot-java--spring-initializr-fetch-json (url)
   "Retrieve the Spring initializr JSON model from a given URL."
   (require 'url)
-  (let ((url-request-method "GET")
-        (url-request-extra-headers
-         '(("Accept" . "application/vnd.initializr.v2.1+json")))
-        (url-request-data
-         (mapconcat (lambda (arg)
-                      (concat (url-hexify-string (car arg))
-                              "="
-                              (url-hexify-string (cdr arg))))
-                    (list)
-                    "&")))
+  (let ((url-request-method        "GET")
+        (url-request-extra-headers '(("Accept" . "application/vnd.initializr.v2.1+json")))
+        (url-request-data          (mapconcat (lambda (arg)
+                                                (concat (url-hexify-string (car arg))
+                                                        "="
+                                                        (url-hexify-string (cdr arg))))
+                                              (list)
+                                              "&")))
     (url-retrieve url 'eglot-java--spring-switch-to-url-buffer)))
 
 (defun eglot-java--spring-switch-to-url-buffer (_status)
@@ -493,19 +489,19 @@ from a symbol table SYMBOLS."
     (unless (file-exists-p dest-dir)
       (make-directory dest-dir t))
 
-    (let ((large-file-warning-threshold nil)          
+    (let ((large-file-warning-threshold nil)
           (dest-file-name              (expand-file-name (concat (format-time-string "%Y-%m-%d_%N") ".zip")
                                                          dest-dir))
           (source-url                  (format "%s?%s"
                                                eglot-java-spring-starter-url-starterzip
                                                (url-build-query-string (append simple-params
-                                                                               (list 
+                                                                               (list
                                                                                 (list "dependencies"
                                                                                       (mapconcat
-                                                                                       'identity                                                                                       
+                                                                                       'identity
                                                                                        (nconc simple-deps)
                                                                                        ","
-                                                                                       ))))))))      
+                                                                                       ))))))))
       (url-copy-file
        source-url
        dest-file-name
@@ -588,15 +584,21 @@ or its wrapper equivalent (CMD-WRAPPER-NAME) if found in CMD-WRAPPER-DIR."
          (dest-filename                (file-name-nondirectory download-url))
          (dest-abspath                 (expand-file-name dest-filename dest-dir))
          (large-file-warning-threshold nil))
-    (message "Installing Eclipse JDT LSP server.")
+    (message "Installing Eclipse JDT LSP server, please wait...")
     (eglot-java--download-file download-url dest-abspath)
+    (message "Extracting Eclipse JDT LSP archive, please wait...")
     (with-temp-buffer
-      (let ((b (find-file dest-abspath)))
+      (let ((temporary-buffer (find-file dest-abspath)))
         (goto-char (point-min))
         (tar-untar-buffer)
-        (kill-buffer b)))
+        (kill-buffer temporary-buffer)))
     (delete-file dest-abspath)
     (message "Eclipse JDT LSP server installed in folder \n\"%s\"." dest-dir)))
+
+(defun eglot-java--ensure ()
+  (unless (file-exists-p (expand-file-name eglot-java-server-install-dir))
+    (eglot-java--install-lsp-server))
+  (eglot-ensure))
 
 ;;;###autoload
 (defun eglot-java-init ()
@@ -605,7 +607,7 @@ or its wrapper equivalent (CMD-WRAPPER-NAME) if found in CMD-WRAPPER-DIR."
   (setcdr   (assq 'java-mode eglot-server-programs) #'eglot-java--eclipse-contact)
   (add-hook 'project-find-functions  #'eglot-java--project-try)
   (add-hook 'eglot-managed-mode-hook #'eglot-java--setup)
-  (add-hook 'java-mode-hook          #'eglot-ensure))
+  (add-hook 'java-mode-hook          #'eglot-java--ensure))
 
 (provide 'eglot-java)
 ;;; eglot-java.el ends here
