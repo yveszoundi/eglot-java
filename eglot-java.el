@@ -99,6 +99,7 @@
 (make-variable-buffer-local 'eglot-java-project-new-directory)
 
 (declare-function tar-untar-buffer "tar-mode" ())
+(declare-function xml-get-children "xml" (node child-name))
 
 (defun eglot-java--download-file (source-url dest-location)
   "Download a file from a URL at SOURCE-URL and save it to file at DEST-LOCATION."
@@ -348,7 +349,8 @@ from a symbol table SYMBOLS."
   (let* ((json-object-type 'hash-table)
          (json-array-type  'list)
          (json-key-type    'string))
-    (setq eglot-java-spring-starter-jsontext (json-read-from-string (eglot-java--buffer-whole-string (current-buffer))))
+    (setq eglot-java-spring-starter-jsontext (json-read-from-string
+                                              (eglot-java--buffer-whole-string (current-buffer))))
     (kill-buffer)))
 
 (defun eglot-java--buffer-whole-string (buffer)
@@ -603,7 +605,6 @@ or its wrapper equivalent (CMD-WRAPPER-NAME) if found in CMD-WRAPPER-DIR."
 ;;;###autoload
 (defun eglot-java-init ()
   "Initialize the library for use with the Eclipse JDT language server."
-  (interactive)
   (setcdr   (assq 'java-mode eglot-server-programs) #'eglot-java--eclipse-contact)
   (add-hook 'project-find-functions  #'eglot-java--project-try)
   (add-hook 'eglot-managed-mode-hook #'eglot-java--setup)
