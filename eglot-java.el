@@ -2,13 +2,13 @@
 
 ;; Copyright (C) 2019-2021 Yves Zoundi
 
-;; Version: 1.2
-;; Package-Version: 20210619.2149
-;; Author: Yves Zoundi <yz at spam.me>
-;; Maintainer: Yves Zoundi <yz at spam.me>
+;; Version: 1.3
+;; Package-Version: 20211128.2149
+;; Author: Yves Zoundi <yves_zoundi@hotmail.com>
+;; Maintainer: Yves Zoundi <yves_zoundi@hotmail.com>
 ;; URL: https://github.com/yveszoundi/eglot-java
 ;; Keywords: convenience, languages
-;; Package-Requires: ((emacs "26.1") (eglot "1.0"))
+;; Package-Requires: ((emacs "26.1") (eglot "1.0") (jsonrpc "1.0.0"))
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -48,53 +48,53 @@
   :type 'string
   :group 'eglot-java)
 
-(defcustom eglot-java-server-install-dir "~/.emacs.d/share/eclipse.jdt.ls"
-  "Location of the Eclipse Java language server installation"
+(defcustom eglot-java-server-install-dir (concat user-emacs-directory "share/eclipse.jdt.ls")
+  "Location of the Eclipse Java language server installation."
   :type 'directory
   :group 'eglot-java
   :link '(url-link :tag "Github" "https://github.com/yveszoundi/eglot-java"))
 
 (defcustom eglot-java-junit-platform-console-standalone-jar
-  "~/.emacs.d/share/junit-platform-console-standalone/junit-platform-console-standalone.jar"
-  "Location of the vscode test runner"
+  (concat user-emacs-directory "share/junit-platform-console-standalone/junit-platform-console-standalone.jar")
+  "Location of the vscode test runner."
   :type 'file
   :group 'eglot-java)
 
 (defcustom eglot-java-spring-io-excluded-input-params
   '("_links" "dependencies")
-  "Excluded input parameters"
+  "Excluded input parameters."
   :type '(repeat string)
   :group 'eglot-java)
 
 (defcustom eglot-java-spring-starter-url-projectdef
   "https://start.spring.io"
-  "start url"
+  "Start url."
   :type 'string
   :group 'eglot-java)
 
 (defcustom eglot-java-spring-starter-url-starterzip
   "https://start.spring.io/starter.zip"
-  "API endpoint to create a spring boot project"
+  "API endpoint to create a spring boot project."
   :type 'string
   :group 'eglot-java)
 
 (defcustom eglot-java-workspace-folder
   (expand-file-name "~")
-  "Java projects default folder"
+  "Java projects default folder."
   :type 'string
   :group 'eglot-java)
 
 (defcustom eglot-java-default-bindings-enabled t
-  "Enable default keybindings in java-mode"
+  "Enable default keybindings in `java-mode'."
   :type 'boolean
   :group 'eglot-java)
 
 (defcustom eglot-java-prefix-key "C-c l"
-  "Prefix key for eglot java-mode commands"
+  "Prefix key for eglot `java-mode' commands."
   :type 'string
   :group 'eglot-java)
 
-(defvar eglot-java-spring-starter-jsontext nil "Spring IO JSON payload")
+(defvar eglot-java-spring-starter-jsontext nil "Spring IO JSON payload.")
 
 (make-variable-buffer-local 'eglot-java-project-new-directory)
 
@@ -119,6 +119,7 @@ Otherwise returns nil"
     (and root (cons 'java root))))
 
 (cl-defmethod project-root ((project (head java)))
+  "Get the root of a JAVA PROJECT."
   (cdr project))
 
 (defun eglot-java--find-equinox-launcher ()
@@ -135,6 +136,7 @@ Otherwise returns nil"
                       lsp-java-server-plugins-dir)))
 
 (defun eglot-java--eclipse-contact (interactive)
+  "Setup the classpath in an INTERACTIVE fashion."
   (let ((cp (getenv "CLASSPATH")))
     (setenv "CLASSPATH" (concat cp path-separator (eglot-java--find-equinox-launcher)))
     (unwind-protect
@@ -297,8 +299,7 @@ import org.junit.jupiter.api.Test;\n\npublic class %s {\n\n}")))
     (format "%s%s%s" package-name package-suffix class-name)))
 
 (defun eglot-java--symbol-value (symbols symbol-type)
-  "Extract the symbol value for a given SYMBOL-TYPE
-from a symbol table SYMBOLS."
+  "Extract the symbol value for a given SYMBOL-TYPE from a symbol table SYMBOLS."
   (let ((symbol-details (cl-find-if
                          (lambda (elem)
                            (let* ((elem-kind (plist-get elem :kind))
@@ -317,9 +318,11 @@ from a symbol table SYMBOLS."
    (list :textDocument (list :uri (eglot--path-to-uri (buffer-file-name))))))
 
 (defun eglot-java--kbd (key)
+  "Define a keystroke for a given KEY accordingly to the current keymap prefix."
   (kbd (concat eglot-java-prefix-key " " key)))
 
 (defun eglot-java--setup ()
+  "Configure default behavior such as keybindings."
   (when (and eglot-java-default-bindings-enabled
              (derived-mode-p 'java-mode))
     (define-key eglot-mode-map (eglot-java--kbd "n") #'eglot-java-file-new)
@@ -344,7 +347,7 @@ from a symbol table SYMBOLS."
 
 (defun eglot-java--spring-switch-to-url-buffer (_status)
   "Switch to the buffer returned by `url-retrieve'.
-    The buffer contains the raw HTTP response sent by the server."
+The buffer contains the raw HTTP response sent by the server."
   (require 'json)
   (let* ((json-object-type 'hash-table)
          (json-array-type  'list)
@@ -366,6 +369,7 @@ from a symbol table SYMBOLS."
   (eglot-java--spring-initializr-fetch-json eglot-java-spring-starter-url-projectdef))
 
 (defun eglot-java-project-new ()
+  "Create a new Java project."
   (interactive)
   (let ((project-type (completing-read "Project Type: " '("spring" "maven" "gradle") nil t "spring")))
     (funcall (intern (concat "eglot-java--project-new-" project-type)))))
@@ -502,8 +506,7 @@ from a symbol table SYMBOLS."
                                                                                       (mapconcat
                                                                                        'identity
                                                                                        (nconc simple-deps)
-                                                                                       ","
-                                                                                       ))))))))
+                                                                                       "," ))))))))
       (url-copy-file
        source-url
        dest-file-name
@@ -514,22 +517,20 @@ from a symbol table SYMBOLS."
       (revert-buffer))))
 
 (defun eglot-java--project-new-process-sentinel (process event)
+  "Switch to the project directory when the PROCESS finishes with a success EVENT."
   (when (string-prefix-p "finished" event)
     (switch-to-buffer (process-buffer process))
     (dired eglot-java-project-new-directory)
     (revert-buffer)))
 
 (defun eglot-java--build-run (initial-dir cmd args)
-  "Start a compilation from a direction INITIAL-DIR
-with a given command string CMD
-and its arguments string ARGS."
+  "Start a compilation from a direction INITIAL-DIR with a given command string CMD and its arguments string ARGS."
   (let ((mvn-cmd           (concat cmd " " args))
         (default-directory initial-dir))
     (compile mvn-cmd t)))
 
 (defun eglot-java--build-executable(cmd cmd-wrapper-name cmd-wrapper-dir)
-  "Returns the command to run, either the initial command itself CMD
-or its wrapper equivalent (CMD-WRAPPER-NAME) if found in CMD-WRAPPER-DIR."
+  "Return the command to run, either the initial command itself CMD or its wrapper equivalent (CMD-WRAPPER-NAME) if found in CMD-WRAPPER-DIR."
   (let ((cmd-wrapper-abspath (executable-find (expand-file-name
                                                cmd-wrapper-name
                                                cmd-wrapper-dir))))
@@ -598,6 +599,7 @@ or its wrapper equivalent (CMD-WRAPPER-NAME) if found in CMD-WRAPPER-DIR."
     (message "Eclipse JDT LSP server installed in folder \n\"%s\"." dest-dir)))
 
 (defun eglot-java--ensure ()
+  "Install the LSP server as needed and then turn-on eglot."
   (unless (file-exists-p (expand-file-name eglot-java-server-install-dir))
     (eglot-java--install-lsp-server))
   (eglot-ensure))
