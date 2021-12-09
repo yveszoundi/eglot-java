@@ -10,9 +10,9 @@ This package provides additional Java programming language support for [[https:/
 |------------------------------------+-------------------------------------------------------------------------|
 | Function                           | Description                                                             |
 |------------------------------------+-------------------------------------------------------------------------|
-| =eglot-java-project-new=           | Create new projects ([[https://start.spring.io/][spring]], [[https://maven.apache.org/][Maven]] or [[https://gradle.org/][Gradle]] projects)                  |
-| =eglot-java-project-build-refresh= | Rebuild the project                                                     |
-| =eglot-java-project-build-task=    | Run a build task using [[https://gradle.org/][Gradle]] or [[https://maven.apache.org/][Maven]] for the project                  |
+| =eglot-java-project-new=           | Create new projects with a wizard ([[https://start.spring.io/][spring]], [[https://maven.apache.org/][Maven]] or [[https://gradle.org/][Gradle]] projects)    |
+| =eglot-java-project-build-refresh= | Rebuild the current project                                             |
+| =eglot-java-project-build-task=    | Run a build task using [[https://gradle.org/][Gradle]] or [[https://maven.apache.org/][Maven]] for the current project          |
 | =eglot-java-file-new=              | Wizard for creating new Java files                                      |
 | =eglot-java-run-main=              | Run the current main class                                              |
 | =eglot-java-run-test=              | Run the current test ([[https://junit.org/junit5/][JUnit]] only, unless you run Maven or Gradle tasks) |
