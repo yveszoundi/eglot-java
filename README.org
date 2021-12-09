@@ -2,8 +2,10 @@
 
 * Overview
 
-This project is a set of functions for Java programming inside [[https://www.gnu.org/software/emacs/][Emacs]], using the [[https://github.com/eclipse/eclipse.jdt.ls][Eclipse JDT Language Server]] (code completion, refactoring, lookup symbols, etc.).
-The implementation leverages [[https://github.com/joaotavora/eglot][eglot]] (and its transient dependency [[https://github.com/emacs-mirror/emacs/blob/master/lisp/progmodes/project.el][project.el]] for project management).
+This package provides additional Java programming language support for [[https://github.com/joaotavora/eglot][eglot]].
+- Few convenience functions are available for common operations such as creating a new project or class.
+- The [[https://github.com/eclipse/eclipse.jdt.ls][Eclipse JDT Language Server]] is automatically installed (if needed) when you open a Java file: this gives you code completion, refactoring capabilities, etc.
+
 
 |------------------------------------+-------------------------------------------------------------------------|
 | Function                           | Description                                                             |
