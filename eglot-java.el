@@ -33,22 +33,26 @@
 (require 'project)
 (require 'eglot)
 
-(defgroup eglot-java nil
+(defgroup eglot-java
+  nil
   "Interaction with a Java language server via eglot."
   :prefix "eglot-java-"
   :group 'eglot)
 
-(defcustom eglot-java-eclipse-jdt-ls-download-url "https://download.eclipse.org/jdtls/snapshots/jdt-language-server-latest.tar.gz"
+(defcustom eglot-java-eclipse-jdt-ls-download-url
+  "https://download.eclipse.org/jdtls/snapshots/jdt-language-server-latest.tar.gz"
   "URL to download the latest Eclipse JDT language server."
   :type 'string
   :group 'eglot-java)
 
-(defcustom eglot-java-junit-platform-console-standalone-jar-url "http://repository.sonatype.org/service/local/artifact/maven/redirect?r=central-proxy&g=org.junit.platform&a=junit-platform-console-standalone&v=LATEST"
+(defcustom eglot-java-junit-platform-console-standalone-jar-url
+  "http://repository.sonatype.org/service/local/artifact/maven/redirect?r=central-proxy&g=org.junit.platform&a=junit-platform-console-standalone&v=LATEST"
   "URL to download the latest JUnit platform standalone console jar."
   :type 'string
   :group 'eglot-java)
 
-(defcustom eglot-java-server-install-dir (concat user-emacs-directory "share/eclipse.jdt.ls")
+(defcustom eglot-java-server-install-dir
+  (concat user-emacs-directory "share/eclipse.jdt.ls")
   "Location of the Eclipse Java language server installation."
   :type 'directory
   :group 'eglot-java
@@ -94,6 +98,9 @@
   :type 'string
   :group 'eglot-java)
 
+(defconst eglot-java-build-filename-maven  "pom.xml"      "Maven build file name.")
+(defconst eglot-java-build-filename-gradle "build.gradle" "Gradle build file name.")
+
 (defvar eglot-java-spring-starter-jsontext nil "Spring IO JSON payload.")
 
 (make-variable-buffer-local 'eglot-java-project-new-directory)
@@ -113,9 +120,9 @@
 (defun eglot-java--project-try (dir)
   "Return project instance if DIR is part of a Java project.
 Otherwise returns nil"
-  (let ((root (or (locate-dominating-file dir "pom.xml")
+  (let ((root (or (locate-dominating-file dir eglot-java-build-filename-maven)
                   (locate-dominating-file dir ".project")
-                  (locate-dominating-file dir "build.gradle"))))
+                  (locate-dominating-file dir eglot-java-build-filename-gradle))))
     (and root (cons 'java root))))
 
 (cl-defmethod project-root ((project (head java)))
@@ -146,14 +153,14 @@ Otherwise returns nil"
 (defun eglot-java--project-name-maven (root)
   "Return the name of a Maven project in the folder ROOT.
 This extracts the project name from the Maven POM (artifactId)."
-  (let* ((pom    (expand-file-name "pom.xml" root))
+  (let* ((pom    (expand-file-name eglot-java-build-filename-maven root))
          (xml    (xml-parse-file pom))
          (parent (car xml)))
     (caddar (xml-get-children parent 'artifactId))))
 
 (defun eglot-java--project-gradle-p (root)
   "Check if a project stored in the folder ROOT is using Gradle as build tool."
-  (file-exists-p (expand-file-name "build.gradle"
+  (file-exists-p (expand-file-name eglot-java-build-filename-gradle
                                    (file-name-as-directory root)) ))
 
 (defun eglot-java--project-name-gradle (root)
@@ -213,8 +220,8 @@ import org.junit.jupiter.api.Test;\n\npublic class %s {\n\n}")))
                              (eglot--current-server-or-lose)
                              "java.project.listSourcePaths" (list)))
          (source-paths      (mapcar
-                             'identity
-                             (car  (cl-remove-if-not 'vectorp source-list))))
+                             #'identity
+                             (car  (cl-remove-if-not #'vectorp source-list))))
          (display-paths     (mapcar (lambda (e)
                                       (plist-get e :displayPath))
                                     source-paths))
@@ -229,7 +236,7 @@ import org.junit.jupiter.api.Test;\n\npublic class %s {\n\n}")))
          (new-paths         (butlast path-elements))
          (dest-folder       (file-name-as-directory
                              (expand-file-name
-                              (mapconcat 'identity new-paths "/")
+                              (mapconcat #'identity new-paths "/")
                               (plist-get selected-source :path))))
          (simple-class-name (car (last path-elements))))
 
@@ -242,7 +249,7 @@ import org.junit.jupiter.api.Test;\n\npublic class %s {\n\n}")))
     (save-buffer)
 
     (when new-paths
-      (insert (concat "package " (mapconcat 'identity new-paths ".") ";\n\n")))
+      (insert (concat "package " (mapconcat #'identity new-paths ".") ";\n\n")))
 
     (insert (format (gethash class-type class-by-type)
                     simple-class-name))
@@ -269,7 +276,7 @@ import org.junit.jupiter.api.Test;\n\npublic class %s {\n\n}")))
                    " -c ")
                  fqcn
                  " -class-path "
-                 (mapconcat 'identity cp path-separator)
+                 (mapconcat #'identity cp path-separator)
                  " ")
          t)
       (user-error "No test found in current file! Is the file saved?" ))))
@@ -282,7 +289,7 @@ import org.junit.jupiter.api.Test;\n\npublic class %s {\n\n}")))
     (if fqcn
         (compile
          (concat "java -cp "
-                 (mapconcat 'identity cp path-separator)
+                 (mapconcat #'identity cp path-separator)
                  " "
                  fqcn)
          t)
@@ -396,7 +403,7 @@ The buffer contains the raw HTTP response sent by the server."
         (with-current-buffer b
           (setq eglot-java-project-new-directory dest-dir))
 
-        (set-process-sentinel p 'eglot-java--project-new-process-sentinel)))))
+        (set-process-sentinel p #'eglot-java--project-new-process-sentinel)))))
 
 (defun eglot-java--project-new-gradle ()
   "Create a new Gradle project."
@@ -429,7 +436,7 @@ The buffer contains the raw HTTP response sent by the server."
            (eglot-java--build-run
             selected-project-dir
             (eglot-java--build-executable "gradle" "gradlew" selected-project-dir)
-            (mapconcat 'identity
+            (mapconcat #'identity
                        (list "init"
                              "--type"
                              selected-project-type
@@ -441,10 +448,10 @@ The buffer contains the raw HTTP response sent by the server."
       (with-current-buffer b
         (setq eglot-java-project-new-directory selected-project-dir))
 
-      (set-process-sentinel (get-buffer-process b) 'eglot-java--project-new-process-sentinel))))
+      (set-process-sentinel (get-buffer-process b) #'eglot-java--project-new-process-sentinel))))
 
 (defun eglot-java--project-new-spring ()
-  "Create a new Spring java project using spring initializr."
+  "Create a new Spring java project using spring initializr.  User input parameters are extracted from the JSON structure."
   (unless eglot-java-spring-starter-jsontext
     (eglot-java--spring-read-json)
     (while (not eglot-java-spring-starter-jsontext)
@@ -478,7 +485,7 @@ The buffer contains the raw HTTP response sent by the server."
                                                                                    eglot-java-spring-starter-jsontext))))))))
                          elems))
          (simple-deps   (completing-read-multiple "Select dependencies (comma separated, TAB to add more): "
-                                                  (apply 'nconc
+                                                  (apply #'nconc
                                                          (mapcar
                                                           (lambda (s)
                                                             (mapcar
@@ -504,13 +511,10 @@ The buffer contains the raw HTTP response sent by the server."
                                                                                (list
                                                                                 (list "dependencies"
                                                                                       (mapconcat
-                                                                                       'identity
+                                                                                       #'identity
                                                                                        (nconc simple-deps)
                                                                                        "," ))))))))
-      (url-copy-file
-       source-url
-       dest-file-name
-       t)
+      (url-copy-file source-url dest-file-name t)
 
       (dired (file-name-directory dest-file-name))
 
@@ -544,8 +548,8 @@ The buffer contains the raw HTTP response sent by the server."
   (interactive)
   (let* ((root       (cdr (project-current)))
          (build-file (if (eglot-java--project-gradle-p root)
-                         (expand-file-name "build.gradle" (file-name-as-directory root))
-                       (expand-file-name "pom.xml" (file-name-as-directory root)))))
+                         (expand-file-name eglot-java-build-filename-gradle (file-name-as-directory root))
+                       (expand-file-name eglot-java-build-filename-maven (file-name-as-directory root)))))
     (when (file-exists-p build-file)
       (progn
         (jsonrpc-notify
@@ -564,8 +568,8 @@ The buffer contains the raw HTTP response sent by the server."
          (goal                      (read-string "Task & Parameters: " "test"))
          (project-is-gradle-project (eglot-java--project-gradle-p project-dir))
          (build-filename            (if project-is-gradle-project
-                                        "build.gradle"
-                                      "pom.xml"))
+                                        eglot-java-build-filename-gradle
+                                      eglot-java-build-filename-maven))
          (build-filename-flag       (if project-is-gradle-project
                                         "-b"
                                       "-f"))
