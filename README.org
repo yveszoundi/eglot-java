@@ -30,7 +30,9 @@ Copy the contents of /eglot-java.el/ to a new Emacs buffer and run the command =
 
 ** Customization
 
-You can configure few settings to reflect your preferences via =M-x customize-group= (/eglot-java/): LSP server installation folder, etc. The default =java-mode= keybindings are controlled by the custom variable =eglot-java-default-bindings-enabled= and the prefix key variable =eglot-java-prefix-key= (=C-c l=).
+You can configure few settings to reflect your preferences via =M-x customize-group= (/eglot-java/): LSP server installation folder, etc.
+- The default =java-mode= keybindings are controlled by the custom variable =eglot-java-default-bindings-enabled=.
+- The default prefix key for available functions is defined by the variable =eglot-java-prefix-key= (=C-c l=).
 
 ** Configuration
 
