@@ -102,7 +102,7 @@
 (defconst eglot-java-build-filename-gradle "build.gradle" "Gradle build file name.")
 
 (defvar eglot-java-spring-starter-jsontext nil "Spring IO JSON payload.")
-
+(defvar eglot-java-project-new-directory nil "The newly created java project directory location.")
 (make-variable-buffer-local 'eglot-java-project-new-directory)
 
 (declare-function tar-untar-buffer "tar-mode" ())
@@ -142,7 +142,7 @@ Otherwise returns nil"
     (expand-file-name equinox-launcher-jar
                       lsp-java-server-plugins-dir)))
 
-(defun eglot-java--eclipse-contact (interactive)
+(defun eglot-java--eclipse-contact (_interactive)
   "Setup the classpath in an INTERACTIVE fashion."
   (let ((cp (getenv "CLASSPATH")))
     (setenv "CLASSPATH" (concat cp path-separator (eglot-java--find-equinox-launcher)))
