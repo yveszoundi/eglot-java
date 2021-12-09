@@ -2,7 +2,7 @@
 
 * Overview
 
-This project is a set of functions for Java programming inside [[https://www.gnu.org/software/emacs/][Emacs]], using the [[https://github.com/eclipse/eclipse.jdt.ls][Eclipse JDT Language Server]].
+This project is a set of functions for Java programming inside [[https://www.gnu.org/software/emacs/][Emacs]], using the [[https://github.com/eclipse/eclipse.jdt.ls][Eclipse JDT Language Server]] (code completion, refactoring, lookup symbols, etc.).
 The implementation leverages [[https://github.com/joaotavora/eglot][eglot]] (and its transient dependency [[https://github.com/emacs-mirror/emacs/blob/master/lisp/progmodes/project.el][project.el]] for project management).
 
 |------------------------------------+-------------------------------------------------------------------------|
