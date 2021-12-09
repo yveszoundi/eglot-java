@@ -20,6 +20,8 @@ The implementation leverages [[https://github.com/joaotavora/eglot][eglot]] (and
 
 - The only *direct* Emacs package dependency is [[https://github.com/joaotavora/eglot][eglot]], assuming you're running a recent Emacs version.
 - The [[https://projects.eclipse.org/projects/eclipse.jdt.ls/downloads][Eclipse JDT Language server]] along with the [[https://mvnrepository.com/artifact/org.junit.platform/junit-platform-console-standalone][JUnit console runner]] are configured to be *automatically installed* when not found at default locations (see =M-x customize-group= /eglot-java/).
+  - The Eclipse JDT.LS team mentions that there's support for [[https://github.com/eclipse/eclipse.jdt.ls#features][compiling projects from Java 1.5 through 16]], but you're encouraged to use recent versions of the Java Development Toolkit ([[https://www.oracle.com/java/technologies/downloads/][JDK]]).
+  - This extension has been tested with recent Java and Eclipse JDT snapshot versions for few of years (since roughly mid-2018).
 - Please also configure your *[[https://www.java.com/en/download/help/path.html][PATH]]* environment variable [[https://www.tutorialspoint.com/maven/maven_environment_setup.htm][for Maven]] and/or [[https://docs.gradle.org/current/userguide/installation.html][for Gradle]].
 
 * Installation
