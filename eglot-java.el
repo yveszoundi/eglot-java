@@ -3,7 +3,6 @@
 ;; Copyright (C) 2019-2021 Yves Zoundi
 
 ;; Version: 1.3
-;; Package-Version: 20211128.2149
 ;; Author: Yves Zoundi <yves_zoundi@hotmail.com>
 ;; Maintainer: Yves Zoundi <yves_zoundi@hotmail.com>
 ;; URL: https://github.com/yveszoundi/eglot-java
@@ -249,7 +248,7 @@ import org.junit.jupiter.api.Test;\n\npublic class %s {\n\n}")))
     (save-buffer)
 
     (when new-paths
-      (insert (concat "package " (mapconcat #'identity new-paths ".") ";\n\n")))
+      (insert "package " (mapconcat #'identity new-paths ".") ";\n\n"))
 
     (insert (format (gethash class-type class-by-type)
                     simple-class-name))
