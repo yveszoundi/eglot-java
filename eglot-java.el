@@ -1,6 +1,6 @@
 ;;; eglot-java.el --- Java extension for the eglot LSP client  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2019-2021 Yves Zoundi
+;; Copyright (C) 2019-2022 Yves Zoundi
 
 ;; Version: 1.4
 ;; Author: Yves Zoundi <yves_zoundi@hotmail.com>
