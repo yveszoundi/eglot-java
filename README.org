@@ -1,5 +1,7 @@
 #+TITLE: README
 
+[[https://melpa.org/#/eglot-java][file:https://melpa.org/packages/eglot-java-badge.svg]]
+
 * Overview
 
 This package provides additional Java programming language support for [[https://github.com/joaotavora/eglot][eglot]].
