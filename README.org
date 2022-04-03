@@ -4,6 +4,7 @@
 
 This package provides additional Java programming language support for [[https://github.com/joaotavora/eglot][eglot]].
 - Few convenience functions are available for common operations such as creating a new project or class.
+- There are couple of customization options , including passing custom JVM arguments to the Eclipse JDT language server.
 - The [[https://github.com/eclipse/eclipse.jdt.ls][Eclipse JDT Language Server]] is automatically installed (if needed) when you open a Java file: this gives you code completion, refactoring capabilities, etc.
 
 
@@ -28,15 +29,20 @@ This package provides additional Java programming language support for [[https:/
 
 * Installation
 
-Copy the contents of /eglot-java.el/ to a new Emacs buffer and run the command =M-x package-install-from-buffer=.
+The =eglot-java= package is available on [[https://melpa.org/#/getting-started][MELPA]].
+
+Once the MELPA repository is configured, please run =M-x package-install= and type =eglot-java=.
 
 * Usage
 
 ** Customization
 
-You can configure few settings to reflect your preferences via =M-x customize-group= (/eglot-java/): LSP server installation folder, etc.
+You can configure few settings to reflect your preferences via =M-x customize-group= (/eglot-java/):
+- You can set the default LSP server installation folder, etc.
+- You can specify JVM arguments for the LSP server (=eglot-java-eclipse-jdt-args= variable).
 - The default =java-mode= keybindings are controlled by the custom variable =eglot-java-default-bindings-enabled=.
 - The default prefix key for available functions is defined by the variable =eglot-java-prefix-key= (=C-c l=).
+- etc.
 
 ** Configuration
 
@@ -48,3 +54,9 @@ Please find below a simple initialization of this package.
     (require 'eglot-java)
     '(eglot-java-init)))
 #+end_src
+
+* Contributing
+
+All the bugs report are welcome and appreciated.
+- *Please note that the best way to contribute is via pull requests*.
+- I may not notice immediately when something is broken: I don't write that much code nowadays (proof of concepts, side-projects or "occasional work related things", specific or one-off tooling).
