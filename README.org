@@ -66,7 +66,7 @@ You need to set BOTH =eglot-java-prefix-key= and =eglot-java-prefix-key= =eglot-
 - =eglot-java-prefix-key= is now nil by default
 - That gives you the opportunity to decide for yourself the keybindings that you prefer.
 
-Bindings auto-configuration details are as follow.
+Bindings auto-configuration details are as follow (values set in the =eglot-mode-map=).
 
 |---------------------------+------------------------------------|
 | Key sequence              | Function                           |
