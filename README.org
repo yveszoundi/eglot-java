@@ -9,7 +9,6 @@ This package provides additional Java programming language support for [[https:/
 - There are couple of customization options , including passing custom JVM arguments to the Eclipse JDT language server.
 - The [[https://github.com/eclipse/eclipse.jdt.ls][Eclipse JDT Language Server]] is automatically installed (if needed) when you open a Java file: this gives you code completion, refactoring capabilities, etc.
 
-
 |------------------------------------+-------------------------------------------------------------------------|
 | Function                           | Description                                                             |
 |------------------------------------+-------------------------------------------------------------------------|
@@ -48,17 +47,41 @@ You can configure few settings to reflect your preferences via =M-x customize-gr
 
 ** Configuration
 
-Please find below a simple initialization of this package.
+*** Initialization
+
+Below is a sample minimal configuration, without any fancy library such as =use-package= or similar.
 
 #+begin_src elisp
-(eval-after-load 'eglot-java
-  (progn
-    (require 'eglot-java)
-    '(eglot-java-init)))
+  (eval-after-load 'eglot-java
+    (progn
+      (require 'eglot-java)
+      (setq eglot-java-prefix-key "C-c l")
+      (setq eglot-java-default-bindings-enabled t)
+      '(eglot-java-init)))
 #+end_src
+
+*** Default keybindings
+
+You need to set BOTH =eglot-java-prefix-key= and =eglot-java-prefix-key= =eglot-java-default-bindings-enabled= in order to enable default keybindings.
+- =eglot-java-prefix-key= is now nil by default
+- That gives you the opportunity to decide for yourself the keybindings that you prefer.
+
+Bindings auto-configuration details are as follow.
+
+|---------------------------+------------------------------------|
+| Key sequence              | Function                           |
+|---------------------------+------------------------------------|
+| =eglot-java-prefix-key n= | =eglot-java-file-new=              |
+| =eglot-java-prefix-key x= | =eglot-java-run-main=              |
+| =eglot-java-prefix-key t= | =eglot-java-run-test=              |
+| =eglot-java-prefix-key N= | =eglot-java-project-new=           |
+| =eglot-java-prefix-key T= | =eglot-java-project-build-task=    |
+| =eglot-java-prefix-key R= | =eglot-java-project-build-refresh= |
+|---------------------------+------------------------------------|
+
 
 * Contributing
 
-All the bugs report are welcome and appreciated.
+All the bugs reports are welcome and appreciated.
 - *Please note that the best way to contribute is via pull requests*.
-- I may not notice immediately when something is broken: I don't write that much code nowadays (proof of concepts, side-projects or "occasional work related things", specific or one-off tooling).
+- I may not notice immediately when something is broken, as I don't really write that much Java code anymore.
