@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2019-2022 Yves Zoundi
 
-;; Version: 1.5
+;; Version: 1.6
 ;; Author: Yves Zoundi <yves_zoundi@hotmail.com>
 ;; Maintainer: Yves Zoundi <yves_zoundi@hotmail.com>
 ;; URL: https://github.com/yveszoundi/eglot-java
@@ -24,24 +24,26 @@
 
 ;;; Commentary:
 
-;; Java extension for eglot. Some of the key features include the following:
+;; Java extension for eglot. 
+;;
+;; Some of the key features include the following:
 ;; - Automatic installation of the Eclipse JDT LSP server.
 ;; - Ability to pass JVM arguments to the Eclipse JDT LSP server (eglot-java-eclipse-jdt-args)
 ;; - Wizards for Spring starter, Maven and Gradle project creation
 ;; - Generic build command support for Maven and Gradle projects
 ;; - JUnit tests support, this hasn't been tested for a while...
 ;;
-;; Add the following lines to your .emacs configuration;;
+;; Below is a sample configuration for your emacs init file
 ;;
-;; (eval-after-load 'eglot-java
-;;  (progn
-;;    (require 'eglot-java)
-;;    ;; The prefix key will be associated to the keymap eglot-mode-map
-;;    ;; This is a customizable variable in the eglot-java group
-;;    (setq eglot-java-prefix-key "C-c l")
-;;    (setq eglot-java-default-bindings-enabled t)
-;;    '(eglot-java-init)))
-;;
+;; (add-hook 'java-mode-hook 'eglot-java-mode)
+;; (add-hook 'eglot-java-mode-hook (lambda ()                                        
+;;   (define-key eglot-java-mode-map (kbd "C-c l n") #'eglot-java-file-new)
+;;   (define-key eglot-java-mode-map (kbd "C-c l x") #'eglot-java-run-main)
+;;   (define-key eglot-java-mode-map (kbd "C-c l t") #'eglot-java-run-test)
+;;   (define-key eglot-java-mode-map (kbd "C-c l N") #'eglot-java-project-new)
+;;   (define-key eglot-java-mode-map (kbd "C-c l T") #'eglot-java-project-build-task)
+;;   (define-key eglot-java-mode-map (kbd "C-c l R") #'eglot-java-project-build-refresh)))
+
 ;;; Code:
 
 (require 'project)
@@ -108,16 +110,6 @@
   :type 'string
   :group 'eglot-java)
 
-(defcustom eglot-java-default-bindings-enabled nil
-  "Enable default keybindings in `java-mode'."
-  :type 'boolean
-  :group 'eglot-java)
-
-(defcustom eglot-java-prefix-key nil
-  "Prefix key for eglot `java-mode' commands, that will be bound to the eglot-mode-map."
-  :type 'string
-  :group 'eglot-java)
-
 (defconst eglot-java-build-filename-maven  "pom.xml"      "Maven build file name.")
 (defconst eglot-java-build-filename-gradle "build.gradle" "Gradle build file name.")
 
@@ -151,7 +143,10 @@
                             ".."
                             (file-name-directory
                              (file-chase-links (executable-find "javac"))))))))
-          `(:settings (:java (:home ,home)))
+          `(:settings (:java (:home ,home))
+                       (:import (:gradle (:enabled t)))
+                      
+                      )
         (ignore (eglot--warn "JAVA_HOME env var not set")))))
 
 (defun eglot--eclipse-jdt-contact (interactive)
@@ -442,24 +437,6 @@ import org.junit.jupiter.api.Test;\n\npublic class %s {\n\n}")))
    :textDocument/documentSymbol
    (list :textDocument (list :uri (eglot--path-to-uri (buffer-file-name))))))
 
-(defun eglot-java--kbd (key)
-  "Define a keystroke for a given KEY accordingly to the current keymap prefix."
-  (kbd (concat eglot-java-prefix-key " " key)))
-
-(defun eglot-java--setup ()
-  "Configure default behavior such as keybindings."
-  (when (and eglot-java-default-bindings-enabled
-             (derived-mode-p 'java-mode))
-    (if (boundp 'eglot-java-prefix-key)
-        (progn
-          (define-key eglot-mode-map (eglot-java--kbd "n") #'eglot-java-file-new)
-          (define-key eglot-mode-map (eglot-java--kbd "x") #'eglot-java-run-main)
-          (define-key eglot-mode-map (eglot-java--kbd "t") #'eglot-java-run-test)
-          (define-key eglot-mode-map (eglot-java--kbd "N") #'eglot-java-project-new)
-          (define-key eglot-mode-map (eglot-java--kbd "T") #'eglot-java-project-build-task)
-          (define-key eglot-mode-map (eglot-java--kbd "R") #'eglot-java-project-build-refresh))
-      (user-error "Please customize the variable eglot-java-prefix-key. A valid value could be: C-c l"))))
-
 (defun eglot-java--spring-initializr-fetch-json (url)
   "Retrieve the Spring initializr JSON model from a given URL."
   (require 'url)
@@ -727,13 +704,27 @@ The buffer contains the raw HTTP response sent by the server."
     (eglot-java--install-lsp-server))
   (eglot-ensure))
 
+(defun eglot-java--init ()
+  "Initialize the library for use with the Eclipse JDT language server."  
+  (unless (eq 'eglot-java--eclipse-contact (assq 'java-mode eglot-server-programs))
+    (setcdr (assq 'java-mode eglot-server-programs) #'eglot-java--eclipse-contact))
+
+  (unless (member 'eglot-java--project-try project-find-functions)
+    (add-hook 'project-find-functions  #'eglot-java--project-try)))
+
+(defvar eglot-java-mode-map (make-sparse-keymap))
+
 ;;;###autoload
-(defun eglot-java-init ()
-  "Initialize the library for use with the Eclipse JDT language server."
-  (setcdr   (assq 'java-mode eglot-server-programs) #'eglot-java--eclipse-contact)
-  (add-hook 'project-find-functions  #'eglot-java--project-try)
-  (add-hook 'eglot-managed-mode-hook #'eglot-java--setup)
-  (add-hook 'java-mode-hook          #'eglot-java--ensure))
+(define-minor-mode eglot-java-mode
+  "Toggle eglot-java-mode."
+  ;; The initial value.
+  :init-value nil
+  ;; The indicator for the mode line.
+  :lighter nil
+  (progn    
+    (eglot-java--init)
+    (when eglot-java-mode
+      (eglot-java--ensure))))
 
 (provide 'eglot-java)
 ;;; eglot-java.el ends here
