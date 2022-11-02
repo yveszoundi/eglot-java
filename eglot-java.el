@@ -31,16 +31,19 @@
 ;; - Generic build command support for Maven and Gradle projects
 ;; - JUnit tests support, this hasn't been tested for a while...
 ;;
-;; Add the following lines to your .emacs configuration;;
+;; Add the following lines to your .emacs configuration
 ;;
-;; (eval-after-load 'eglot-java
-;;  (progn
-;;    (require 'eglot-java)
-;;    ;; The prefix key will be associated to the keymap eglot-mode-map
-;;    ;; This is a customizable variable in the eglot-java group
-;;    (setq eglot-java-prefix-key "C-c l")
-;;    (setq eglot-java-default-bindings-enabled t)
-;;    '(eglot-java-init)))
+;;(eglot-java-init)
+;;
+;; (add-hook 'eglot-java-mode-hook (lambda ()
+;;                                   (message "do something in eglot-java-mode-hook if you want")))
+;;
+;; (define-key eglot-java-mode-map (kbd "C-c l n") #'eglot-java-file-new)
+;; (define-key eglot-java-mode-map (kbd "C-c l x") #'eglot-java-run-main)
+;; (define-key eglot-java-mode-map (kbd "C-c l t") #'eglot-java-run-test)
+;; (define-key eglot-java-mode-map (kbd "C-c l N") #'eglot-java-project-new)
+;; (define-key eglot-java-mode-map (kbd "C-c l T") #'eglot-java-project-build-task)
+;; (define-key eglot-java-mode-map (kbd "C-c l R") #'eglot-java-project-build-refresh)
 ;;
 ;;; Code:
 
@@ -725,7 +728,8 @@ The buffer contains the raw HTTP response sent by the server."
   "Install the LSP server as needed and then turn-on eglot."
   (unless (file-exists-p (expand-file-name eglot-java-server-install-dir))
     (eglot-java--install-lsp-server))
-  (eglot-ensure))
+  (eglot-ensure)
+  (eglot-java-mode 1))
 
 ;;;###autoload
 (defun eglot-java-init ()
@@ -734,6 +738,15 @@ The buffer contains the raw HTTP response sent by the server."
   (add-hook 'project-find-functions  #'eglot-java--project-try)
   (add-hook 'eglot-managed-mode-hook #'eglot-java--setup)
   (add-hook 'java-mode-hook          #'eglot-java--ensure))
+
+(defvar eglot-java-mode-map (make-sparse-keymap))
+
+(define-minor-mode eglot-java-mode
+  "Toggle eglot-java-mode."
+ ;; The initial value.
+ :init-value nil
+ ;; The indicator for the mode line.
+ :lighter " eglot-java")
 
 (provide 'eglot-java)
 ;;; eglot-java.el ends here
