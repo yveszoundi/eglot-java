@@ -1,8 +1,8 @@
 ;;; eglot-java.el --- Java extension for the eglot LSP client  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2019-2022 Yves Zoundi
+;; Copyright (C) 2019-2023 Yves Zoundi
 
-;; Version: 1.6
+;; Version: 1.7
 ;; Author: Yves Zoundi <yves_zoundi@hotmail.com>
 ;; Maintainer: Yves Zoundi <yves_zoundi@hotmail.com>
 ;; URL: https://github.com/yveszoundi/eglot-java
@@ -32,6 +32,15 @@
 ;; - Wizards for Spring starter, Maven and Gradle project creation
 ;; - Generic build command support for Maven and Gradle projects
 ;; - JUnit tests support, this hasn't been tested for a while...
+;;
+;; If you're having issues with Gradle projects (auto-completion), ensure that you're using the gradle wrapper in your projects:
+;; - The root cause is likely JVM incompatibilities with the bundled Eclipse Gradle version
+;; - Check your default JDK version
+;; - If using a recent Eclipse JDT LS snapshot, check its bundled gradle version:  https://github.com/eclipse/buildship/blob/master/org.gradle.toolingapi/META-INF/MANIFEST.MF
+;; - Check the gradle compatibility matrix: https://docs.gradle.org/current/userguide/compatibility.html
+;; - Use the gradle wrapper to ensure that you always have a compatible matching JVM version
+;;   - Edit directly your gradle/wrapper/gradle-wrapper.properties
+;;   - or download the matching Gradle version for your JVM and run: gradle wrapper
 ;;
 ;; Below is a sample configuration for your emacs init file
 ;;
@@ -143,10 +152,9 @@
                             ".."
                             (file-name-directory
                              (file-chase-links (executable-find "javac"))))))))
-          `(:settings (:java (:home ,home))
-                       (:import (:gradle (:enabled t)))
-                      
-                      )
+          `(:settings (:java (:home ,home)
+                       :import (:gradle (:enabled t)
+                                        :wrapper (:enabled t))))
         (ignore (eglot--warn "JAVA_HOME env var not set")))))
 
 (defun eglot--eclipse-jdt-contact (interactive)
