@@ -1,6 +1,6 @@
 #+TITLE: README
 
-[[https://melpa.org/#/eglot-java][file:https://melpa.org/packages/eglot-java-badge.svg]]
+[[https://raw.githubusercontent.com/yveszoundi/eglot-java/main/LICENSE][file:http://img.shields.io/badge/license-GNU%20GPLv3-blue.svg]] [[https://melpa.org/#/eglot-java][file:https://melpa.org/packages/eglot-java-badge.svg]]
 
 * Overview
 
