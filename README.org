@@ -60,13 +60,24 @@ Below is a sample minimal configuration, without any fancy library such as =use-
     (define-key eglot-java-mode-map (kbd "C-c l R") #'eglot-java-project-build-refresh)))
 #+end_src
 
-* Other notes for Gradle projects
+* Other notes
+
+** Gradle projects
 
 If you have issues with [[https://gradle.org/][Gradle projects]] (code completion not working), then it's likely due to [[https://docs.gradle.org/current/userguide/compatibility.html][version incompatibilities]] (JDK and bundled Gradle Eclipse versions):
 - The safe approach is to always rely on the Gradle wrapper, accordingly to the [[https://docs.gradle.org/current/userguide/compatibility.html][Gradle compatibility matrix]]
 - As of December 2022, the latest Eclipse JDT LS would include the [[https://github.com/eclipse/eclipse.jdt.ls/blob/master/org.eclipse.jdt.ls.target/org.eclipse.jdt.ls.tp.target#L14][buildship plugin version 3.17.x]] for Gradle support
 - For version =3.17.x= that [[https://github.com/eclipse/buildship/blob/master/org.gradle.toolingapi/META-INF/MANIFEST.MF][translates into Gradle 7.4.2 or later]]
 - =Gradle 7.4.2= would not be compatible with let's say =JDK 19=, the user would need [[https://docs.gradle.org/current/userguide/compatibility.html][Gradle 7.6]], thus why it's best to always use/generate the Gradle wrapper for peace of mind
+
+** Class file navigation
+
+The =classFileContentsSupport= capability is registered with some known limitations. After visiting an initial "class contents buffer", further type definition navigation is not supported. This can be mitigated by the following workflow:
+
+- Go back to the previous =Java= buffer
+- Call =M-x xref-find-apropos= with the name of the class to lookup (fully qualified name or simple class name)
+  - Sometimes the fully qualified class name gives you good results
+  - However, if you don't see the class name in question, please type the simple class name instead
 
 * Contributing
 
