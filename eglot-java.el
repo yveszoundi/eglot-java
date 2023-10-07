@@ -81,6 +81,12 @@
   :type '(repeat string)
   :group 'eglot-java)
 
+(defcustom eglot-java-eclipse-jdt-cache-directory
+  (locate-user-emacs-file "eglot-java-eclipse-jdt-cache")
+  "Eclipse JDT cache directory."
+  :type 'string
+  :group 'eglot-java)
+
 (defcustom eglot-java-eclipse-jdt-ls-download-url
   "https://download.eclipse.org/jdtls/snapshots/jdt-language-server-latest.tar.gz"
   "URL to download the latest Eclipse JDT language server."
@@ -208,8 +214,7 @@ If INTERACTIVE, prompt user for details."
               (t "config_linux"))))
            (workspace
             (expand-file-name (md5 (project-root (eglot--current-project)))
-                              (locate-user-emacs-file
-                               "eglot-java-eclipse-jdt-cache"))))
+                              eglot-java-eclipse-jdt-cache-directory)))
       (unless jar
         (setq jar
               (cl-find-if #'is-the-jar
