@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2019-2023 Yves Zoundi
 
-;; Version: 1.11
+;; Version: 1.12
 ;; Author: Yves Zoundi <yves_zoundi@hotmail.com>
 ;; Maintainer: Yves Zoundi <yves_zoundi@hotmail.com>
 ;; URL: https://github.com/yveszoundi/eglot-java
@@ -57,6 +57,9 @@
 ;;   (define-key eglot-java-mode-map (kbd "C-c l N") #'eglot-java-project-new)
 ;;   (define-key eglot-java-mode-map (kbd "C-c l T") #'eglot-java-project-build-task)
 ;;   (define-key eglot-java-mode-map (kbd "C-c l R") #'eglot-java-project-build-refresh)))
+;;
+;; You can upgrade an existing LSP server installation with the "eglot-java-upgrade-lsp-server" function.
+;;
 
 ;;; Code:
 
@@ -247,6 +250,14 @@ If INTERACTIVE, prompt user for details."
   "Eclipse JDT breaks spec and replies with edits as arguments."
   (mapc #'eglot--apply-workspace-edit arguments))
 
+(defun eglot-java--file-read-trim (file-to-read)
+  "Read contents of a file into a string removing any new lines or whitespace.
+FILE-TO-READ is the file to parse."
+  (with-temp-buffer
+    (insert-file-contents file-to-read)
+    (replace-regexp-in-string "[:blank:]" ""
+                              (replace-regexp-in-string "[\r\n|\n$]" ""
+                                                        (buffer-string)))))
 (defun eglot-java--download-file (source-url dest-location)
   "Download a file from a URL at SOURCE-URL and save it to file at DEST-LOCATION."
   (let* ((dest-dir     (file-name-directory dest-location))
@@ -717,6 +728,8 @@ The buffer contains the raw HTTP response sent by the server."
                           goal))))
 
 (defun eglot-java--get-jdtls-download-metadata(url)
+  "Fetch the LSP server download metadata in JSON format.
+URL is the REST endpoint serving the download metadata in JSON format."  
   (require 'json)
   (with-temp-buffer
     (url-insert-file-contents url)
@@ -726,18 +739,64 @@ The buffer contains the raw HTTP response sent by the server."
       (json-read))))
 
 (defun eglot-java--parse-jdtls-download-metadata (metadata)
+  "Extract LSP server download metadata from a JSON response.
+METADATA is the JSON API response contents."
   (let ((jdtls-download-version (gethash "stable"
                                           (gethash "versions"
                                                    metadata)))
          (jdtls-download-url (gethash "url"
                                       (gethash "stable"
-                                               (gethash "urls" 
-                                                        metadata)))))  
+                                               (gethash "urls"
+                                                        metadata)))))
     (list `("download-version" . ,jdtls-download-version)
           `("download-url" . ,jdtls-download-url))))
 
+(defun eglot-java--upgrade-lsp-server (install-dir)
+  "Upgrade the LSP server installation in a given directory.
+INSTALL-DIR is the directory where the LSP server will be upgraded."
+  (require 'cl-lib)
+  (let* ((buffers-managed (cl-loop for buf in (buffer-list)
+                                   if (with-current-buffer buf
+                                        (when eglot-java-mode
+                                          buf))
+                                   collect buf))
+         (time-cur        (current-time))
+         (tmp-folder-name (format "jdtls-%d-%d" (car time-cur) (car (cdr time-cur))))
+         (install-dir-tmp (expand-file-name tmp-folder-name (temporary-file-directory))))
+    ;; create temporary directory
+    (mkdir install-dir-tmp t)
+    ;; shutdown folders associated to eglot-java-mode
+    (dolist (buf buffers-managed)
+            (with-current-buffer buf
+              (progn
+                (ignore-errors
+                  (eglot-java-mode -1)
+                  (call-interactively 'eglot-shutdown)))))
+    ;; install the new version of the LSP server
+    (let ((install-success (condition-case nil
+                               (progn
+                                 (eglot-java--install-lsp-server install-dir-tmp)
+                                 t)
+                             (error nil))))
+      (if install-success
+          (progn
+            ;; upon success full installation rename the temporary installation folder
+            (let ((install-dir-tmp-tmp (format "%s-tmp" install-dir-tmp)))
+              (rename-file install-dir install-dir-tmp-tmp)
+              (rename-file install-dir-tmp install-dir)
+              (delete-directory install-dir-tmp-tmp t)
+              (message "The LSP server was successfully upgraded.")
+              ;; re-associate the jdtls server to known managed buffers
+              (dolist (buf buffers-managed)
+                      (with-current-buffer buf
+                        (eglot-java-mode 1)))))
+        (ignore-errors
+          ;; when the installation fails, delete the temporary installation directory
+          (delete-directory install-dir-tmp t))))))
+
 (defun eglot-java--install-lsp-server (destination-dir)
-  "Install the Eclipse JDT LSP server."
+  "Install the Eclipse JDT LSP server.
+DESTINATION-DIR is the directory where the LSP server will be installed."
   (let* ((dest-dir                     (expand-file-name destination-dir))
          (download-metadata            (eglot-java--parse-jdtls-download-metadata
                                         (eglot-java--get-jdtls-download-metadata eglot-java-eclipse-jdt-ls-dl-metadata-url)))
@@ -756,8 +815,8 @@ The buffer contains the raw HTTP response sent by the server."
         (goto-char (point-min))
         (tar-untar-buffer)
         (kill-buffer b))
-    (delete-file dest-abspath)        
-        
+    (delete-file dest-abspath)
+
     (let ((b (find-file dest-versionfile)))
       (switch-to-buffer b)
       (insert (format "%s\n" download-version))
@@ -798,7 +857,7 @@ The buffer contains the raw HTTP response sent by the server."
                   (setcdr (assoc eff-existing-java-related-assocs eglot-server-programs) 'eglot-java--eclipse-contact))))
           (add-to-list eglot-server-programs 'java-mode 'eglot-java--eclipse-contact))))
     (unless (member 'eglot-java--project-try project-find-functions)
-      (add-hook 'project-find-functions  #'eglot-java--project-try))))
+      (add-hook 'project-find-functions #'eglot-java--project-try))))
 
 (defvar eglot-java-mode-map (make-sparse-keymap))
 
@@ -860,6 +919,30 @@ handle it. If it is not a jar call ORIGINAL-FN."
     (message "[eglot-java--jdthandler-patch-eglot] Eglot successfully patched.")))
 
 ;;;###autoload
+(defun eglot-java-upgrade-lsp-server ()
+  "Upgrade the LSP server installation."
+  (interactive)
+  (let ((install-dir (expand-file-name eglot-java-server-install-dir)))
+    (if (file-exists-p install-dir)
+        (progn
+          (let ((lsp-server-versionfile (expand-file-name ".eglot-java-jdtls-version" install-dir)))
+            (if (file-exists-p lsp-server-versionfile)
+                (progn
+                  (let* ((version-installed (eglot-java--file-read-trim lsp-server-versionfile))
+                         (download-metadata (eglot-java--parse-jdtls-download-metadata
+                                             (eglot-java--get-jdtls-download-metadata eglot-java-eclipse-jdt-ls-dl-metadata-url)))
+                         (version-latest    (cdr (assoc "download-version" download-metadata))))
+                    (if (version< version-installed version-latest)
+                        (progn
+                          (message "Upgrading the LSP server from version %s to %s." version-installed version-latest)
+                          (eglot-java--upgrade-lsp-server install-dir))                          
+                      (message "You're already running the latest LSP server version (%s)!" version-installed))))
+              (progn
+                (message "No previous LSP server version recorded, installing the latest stable version.")
+                (eglot-java--upgrade-lsp-server install-dir)))))
+      (eglot-java--install-lsp-server install-dir))))
+
+;;;###autoload
 (define-minor-mode eglot-java-mode
   "Toggle eglot-java-mode."
   ;; The initial value.
@@ -868,8 +951,10 @@ handle it. If it is not a jar call ORIGINAL-FN."
   :lighter nil
   (progn
     (eglot-java--init)
-    (when eglot-java-mode
-      (eglot-java--ensure))))
+    (if eglot-java-mode
+        (eglot-java--ensure)
+      (ignore-errors                  
+        (call-interactively 'eglot-shutdown)))))
 
 (provide 'eglot-java)
 ;;; eglot-java.el ends here

@@ -20,6 +20,7 @@ This package provides additional Java programming language support for [[https:/
 | =eglot-java-file-new=              | Wizard for creating new Java files                                      |
 | =eglot-java-run-main=              | Run the current main class                                              |
 | =eglot-java-run-test=              | Run the current test ([[https://junit.org/junit5/][JUnit]] only, unless you run Maven or Gradle tasks) |
+| =eglot-java-upgrade-lsp-server=    | Upgrade the LSP server installation                                     |
 |------------------------------------+-------------------------------------------------------------------------|
 
 * Dependencies
@@ -80,6 +81,12 @@ The =classFileContentsSupport= capability is registered with some known limitati
 - Call =M-x xref-find-apropos= with the name of the class to lookup (fully qualified name or simple class name)
   - Sometimes the fully qualified class name gives you good results
   - However, if you don't see the class name in question, please type the simple class name instead
+  
+** LSP server upgrades
+
+In early versions of =eglot-java=, the LSP server installation was reflecting the latest available snapshot.
+
+As of =eglot-java 1.11= (December 2023), only milestones releases will be installed in order to mitigate challenges with buggy snapshot versions (See issues [[https://github.com/yveszoundi/eglot-java/issues/15][#15]] and [[https://github.com/yveszoundi/eglot-java/issues/16][#16]] for reference).
 
 * Contributing
 
