@@ -7,7 +7,9 @@
 This package provides additional Java programming language support for [[https://github.com/joaotavora/eglot][eglot]].
 - Few convenience functions are available for common operations such as creating a new project or class.
 - There are couple of customization options , including passing custom JVM arguments to the Eclipse JDT language server.
-- The [[https://github.com/eclipse/eclipse.jdt.ls][Eclipse JDT Language Server]] is automatically installed (if needed) when you open a Java file: this gives you code completion, refactoring capabilities, etc.
+- The [[https://github.com/eclipse/eclipse.jdt.ls][Eclipse JDT Language Server]] is automatically installed (if needed) when you open a Java file
+  - This installs the latest known milestone release (instead of the latest snapshot in earlier eglot-java versions)
+  - This gives you code completion, refactoring capabilities, etc.
 
 |------------------------------------+-------------------------------------------------------------------------|
 | Function                           | Description                                                             |

@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2019-2023 Yves Zoundi
 
-;; Version: 1.10
+;; Version: 1.11
 ;; Author: Yves Zoundi <yves_zoundi@hotmail.com>
 ;; Maintainer: Yves Zoundi <yves_zoundi@hotmail.com>
 ;; URL: https://github.com/yveszoundi/eglot-java
@@ -27,7 +27,7 @@
 ;; Java extension for eglot.
 ;;
 ;; Some of the key features include the following:
-;; - Automatic installation of the Eclipse JDT LSP server.
+;; - Automatic installation of the Eclipse JDT LSP server (latest milestone release).
 ;; - Ability to pass JVM arguments to the Eclipse JDT LSP server (eglot-java-eclipse-jdt-args)
 ;; - Wizards for Spring starter, Maven and Gradle project creation
 ;; - Generic build command support for Maven and Gradle projects
@@ -87,9 +87,9 @@
   :type 'string
   :group 'eglot-java)
 
-(defcustom eglot-java-eclipse-jdt-ls-download-url
-  "https://download.eclipse.org/jdtls/snapshots/jdt-language-server-latest.tar.gz"
-  "URL to download the latest Eclipse JDT language server."
+(defcustom eglot-java-eclipse-jdt-ls-dl-metadata-url
+  "https://formulae.brew.sh/api/formula/jdtls.json"
+  "URL to fetch Eclipse JDT language server packaging information."
   :type 'string
   :group 'eglot-java)
 
@@ -145,6 +145,8 @@
 
 (declare-function tar-untar-buffer "tar-mode" ())
 (declare-function xml-get-children "xml" (node child-name))
+
+(make-obsolete-variable 'eglot-java-eclipse-jdt-ls-download-url 'eglot-java-eclipse-jdt-ls-dl-metadata-url "1.11")
 
 (defclass eglot-java-eclipse-jdt (eglot-lsp-server) ()
   :documentation "Eclipse's Java Development Tools Language Server.")
@@ -324,12 +326,8 @@ Otherwise the basename of the folder ROOT will be returned."
       (file-name-nondirectory (directory-file-name (file-name-directory build-file))))))
 
 (defun eglot-java--make-path (root-dir &rest path-elements)
-  (let ((new-path          (expand-file-name (if (listp root-dir)
-                                                 (car root-dir)
-                                               root-dir)))
-        (new-path-elements (if (listp root-dir)
-                               (rest root-dir)
-                             path-elements)))
+  (let ((new-path          (expand-file-name root-dir))
+        (new-path-elements path-elements))
     (dolist (p new-path-elements)
       (setq new-path (concat (file-name-as-directory new-path) p)))
     new-path))
@@ -718,28 +716,60 @@ The buffer contains the raw HTTP response sent by the server."
                            (expand-file-name build-filename project-dir))
                           goal))))
 
-(defun eglot-java--install-lsp-server ()
+(defun eglot-java--get-jdtls-download-metadata(url)
+  (require 'json)
+  (with-temp-buffer
+    (url-insert-file-contents url)
+    (let ((json-object-type 'hash-table)
+          (json-array-type  'list)
+          (json-key-type    'string))
+      (json-read))))
+
+(defun eglot-java--parse-jdtls-download-metadata (metadata)
+  (let ((jdtls-download-version (gethash "stable"
+                                          (gethash "versions"
+                                                   metadata)))
+         (jdtls-download-url (gethash "url"
+                                      (gethash "stable"
+                                               (gethash "urls" 
+                                                        metadata)))))  
+    (list `("download-version" . ,jdtls-download-version)
+          `("download-url" . ,jdtls-download-url))))
+
+(defun eglot-java--install-lsp-server (destination-dir)
   "Install the Eclipse JDT LSP server."
-  (let* ((dest-dir                     (expand-file-name eglot-java-server-install-dir))
-         (download-url                 eglot-java-eclipse-jdt-ls-download-url)
+  (let* ((dest-dir                     (expand-file-name destination-dir))
+         (download-metadata            (eglot-java--parse-jdtls-download-metadata
+                                        (eglot-java--get-jdtls-download-metadata eglot-java-eclipse-jdt-ls-dl-metadata-url)))
+         (download-url                 (cdr (assoc "download-url" download-metadata)))
+         (download-version             (cdr (assoc "download-version" download-metadata)))
          (dest-filename                (file-name-nondirectory download-url))
          (dest-abspath                 (expand-file-name dest-filename dest-dir))
+         (dest-versionfile             (expand-file-name ".eglot-java-jdtls-version" dest-dir))
          (large-file-warning-threshold nil))
     (message "Installing Eclipse JDT LSP server, please wait...")
     (eglot-java--download-file download-url dest-abspath)
+
     (message "Extracting Eclipse JDT LSP archive, please wait...")
-    (with-temp-buffer
-      (let ((temporary-buffer (find-file dest-abspath)))
+    (let ((b (find-file dest-abspath)))
+      (switch-to-buffer b)
         (goto-char (point-min))
         (tar-untar-buffer)
-        (kill-buffer temporary-buffer)))
-    (delete-file dest-abspath)
+        (kill-buffer b))
+    (delete-file dest-abspath)        
+        
+    (let ((b (find-file dest-versionfile)))
+      (switch-to-buffer b)
+      (insert (format "%s\n" download-version))
+      (save-buffer)
+      (kill-buffer b))
+
     (message "Eclipse JDT LSP server installed in folder \n\"%s\"." dest-dir)))
 
 (defun eglot-java--ensure ()
   "Install the LSP server as needed and then turn-on eglot."
   (unless (file-exists-p (expand-file-name eglot-java-server-install-dir))
-    (eglot-java--install-lsp-server))
+    (eglot-java--install-lsp-server eglot-java-server-install-dir))
   (eglot-ensure))
 
 (defun eglot-java--init ()
