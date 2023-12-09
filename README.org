@@ -20,6 +20,7 @@ This package provides additional Java programming language support for [[https:/
 | =eglot-java-file-new=              | Wizard for creating new Java files                                      |
 | =eglot-java-run-main=              | Run the current main class                                              |
 | =eglot-java-run-test=              | Run the current test ([[https://junit.org/junit5/][JUnit]] only, unless you run Maven or Gradle tasks) |
+| =eglot-java-upgrade-lsp-server=    | Upgrade the LSP server installation                                     |
 |------------------------------------+-------------------------------------------------------------------------|
 
 * Dependencies
