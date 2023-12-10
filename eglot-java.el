@@ -767,11 +767,9 @@ INSTALL-DIR is the directory where the LSP server will be upgraded."
     (mkdir install-dir-tmp t)
     ;; shutdown folders associated to eglot-java-mode
     (dolist (buf buffers-managed)
-            (with-current-buffer buf
-              (progn
-                (ignore-errors
-                  (eglot-java-mode -1)
-                  (call-interactively 'eglot-shutdown)))))
+      (with-current-buffer buf              
+        (ignore-errors
+          (eglot-java-mode -1))))
     ;; install the new version of the LSP server
     (let ((install-success (condition-case nil
                                (progn
@@ -788,8 +786,8 @@ INSTALL-DIR is the directory where the LSP server will be upgraded."
               (message "The LSP server was successfully upgraded.")
               ;; re-associate the jdtls server to known managed buffers
               (dolist (buf buffers-managed)
-                      (with-current-buffer buf
-                        (eglot-java-mode 1)))))
+                (with-current-buffer buf
+                  (eglot-java-mode 1)))))
         (ignore-errors
           ;; when the installation fails, delete the temporary installation directory
           (delete-directory install-dir-tmp t))))))
