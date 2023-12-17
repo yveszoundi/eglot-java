@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2019-2024 Yves Zoundi
 
-;; Version: 1.14
+;; Version: 1.15
 ;; Author: Yves Zoundi <yves_zoundi@hotmail.com>
 ;; Maintainer: Yves Zoundi <yves_zoundi@hotmail.com>
 ;; URL: https://github.com/yveszoundi/eglot-java
@@ -158,6 +158,25 @@
 
 (defclass eglot-java-eclipse-jdt (eglot-lsp-server) ()
   :documentation "Eclipse's Java Development Tools Language Server.")
+
+(defun eglot-java--version< (V1 V2)
+  "Return t if version V1 is lower (older) than V2.
+This leverages some built-in emacs version comparison functions behind the scenes.
+This allows additional suffixes in versions for milestones or snapshots. e.g., 1.0.0-m1 vs. 1.0.0."
+  (let* ((v1-parts (split-string V1 "-"))
+         (v2-parts (split-string V2 "-"))
+         (first-v1 (car v1-parts))
+         (first-v2 (car v2-parts))
+         (last-v1  (or (cadr v1-parts) ""))
+         (last-v2  (or (cadr v2-parts) "")))
+    (if (version< first-v1 first-v2)
+        t
+      (when (version= first-v1 first-v2)        
+        (when (not (string= last-v1 last-v2))
+          (if (string= "" last-v2)
+              t
+            (when (not (string= "" last-v1))
+              (string< last-v1 last-v2))))))))
 
 (cl-defmethod eglot-initialization-options ((server eglot-java-eclipse-jdt))
   "Passes through required jdt initialization options."
@@ -528,6 +547,17 @@ METADATA-XML-URL is the Maven URL containing a maven-metadata.xml file for the a
                                     junit-version
                                     junit-version))))
 
+(defun eglot-java--install-junit-jar (junit-jar-path)
+  "Install the JUnit standalone console jar file at a location JUNIT-JAR-PATH"  
+  (let* ((download-metadata (eglot-java--find-latest-junit-metadata eglot-java-maven-repo-root-url))
+         (download-version  (plist-get download-metadata :download-version))
+         (download-url      (plist-get download-metadata :download-url))
+         (version-file-dir  (file-name-directory (expand-file-name junit-jar-path)))
+         (version-file      (expand-file-name ".eglot-java-junit-version" version-file-dir)))
+    (eglot-java--download-file download-url
+                               (expand-file-name junit-jar-path))
+    (eglot-java--record-version-info download-version version-file)))
+
 (defun eglot-java-run-test ()
   "Run a test class."
   (interactive)
@@ -535,15 +565,8 @@ METADATA-XML-URL is the Maven URL containing a maven-metadata.xml file for the a
                                    (eglot-java--class-fqcn)))
          (cp                   (eglot-java--project-classpath (buffer-file-name) "test"))
          (current-file-is-test (not (equal ':json-false (eglot-java--file--test-p (buffer-file-name))))))
-    (unless (file-exists-p eglot-java-junit-platform-console-standalone-jar)
-      (let ((download-metadata  (eglot-java--find-latest-junit-metadata eglot-java-maven-repo-root-url)))
-        (let ((download-version (plist-get download-metadata :download-version))
-              (download-url     (plist-get download-metadata :download-url))
-              (version-file-dir (file-name-directory (expand-file-name eglot-java-junit-platform-console-standalone-jar))))
-          (let ((version-file     (expand-file-name ".eglot-java-junit-version" version-file-dir)))
-            (eglot-java--download-file download-url
-                                       eglot-java-junit-platform-console-standalone-jar)
-            (eglot-java--record-version-info download-version version-file)))))
+    (unless (file-exists-p (expand-file-name eglot-java-junit-platform-console-standalone-jar))
+      (eglot-java--install-junit-jar eglot-java-junit-platform-console-standalone-jar))
     (if current-file-is-test
         (compile
          (concat "java -jar "
@@ -844,7 +867,7 @@ The buffer contains the raw HTTP response sent by the server."
                            (expand-file-name build-filename project-dir))
                           goal))))
 
-(defun eglot-java--get-jdtls-download-metadata(url)
+(defun eglot-java--get-jdtls-download-metadata (url)
   "Fetch the LSP server download metadata in JSON format.
 URL is the REST endpoint serving the download metadata in JSON format."
   (require 'json)
@@ -867,6 +890,37 @@ METADATA is the JSON API response contents."
                                                            metadata)))))
     (list :download-version jdtls-download-version
           :download-url     jdtls-download-url)))
+
+(defun eglot-java--upgrade-junit-jar (junit-jar-path)
+  "Upgrade the JUnit JAR installation for a given path at JUNIT-JAR-PATH."
+  (let* ((time-cur        (current-time))
+         (tmp-folder-name (format "junit-standalone-console-%d-%d" (car time-cur) (car (cdr time-cur))))
+         (install-dir     (expand-file-name (file-name-directory junit-jar-path)))
+         (install-dir-tmp (expand-file-name tmp-folder-name (temporary-file-directory)))
+         (install-jar-tmp (expand-file-name (file-name-nondirectory junit-jar-path) install-dir-tmp)))
+    ;; create temporary directory
+    (message "Install-dir was %s" install-dir)
+    (message "tmp folder %s" install-dir-tmp)
+    (mkdir install-dir-tmp t)
+    ;; install the new version of the LSP server
+    (let ((install-success (condition-case nil
+                               (progn
+                                 (eglot-java--install-junit-jar install-jar-tmp)
+                                 t)
+                             (error nil))))
+      (if install-success          
+          (progn
+            ;; upon success full installation rename the temporary installation folder
+            (let ((install-dir-tmp-tmp (format "%s-tmp" install-dir-tmp)))              
+              (rename-file (directory-file-name install-dir) (directory-file-name install-dir-tmp-tmp))              
+              (rename-file (directory-file-name install-dir-tmp) (directory-file-name install-dir))
+              (delete-directory install-dir-tmp-tmp t)
+              (message "The JUnit jar was successfully upgraded.")))
+        (ignore-errors
+          (progn
+            (message "The JUnit jar upgrade failed!")
+            ;; when the installation fails, delete the temporary installation directory
+            (delete-directory install-dir-tmp t)))))))
 
 (defun eglot-java--upgrade-lsp-server (install-dir)
   "Upgrade the LSP server installation in a given directory.
@@ -897,8 +951,8 @@ INSTALL-DIR is the directory where the LSP server will be upgraded."
           (progn
             ;; upon success full installation rename the temporary installation folder
             (let ((install-dir-tmp-tmp (format "%s-tmp" install-dir-tmp)))
-              (rename-file install-dir install-dir-tmp-tmp)
-              (rename-file install-dir-tmp install-dir)
+              (rename-file (directory-file-name install-dir) (directory-file-name install-dir-tmp-tmp))
+              (rename-file (directory-file-name install-dir-tmp)  (directory-file-name install-dir))
               (delete-directory install-dir-tmp-tmp t)
               (message "The LSP server was successfully upgraded.")
               ;; re-associate the jdtls server to known managed buffers
@@ -951,6 +1005,7 @@ DESTINATION-DIR is the directory where the LSP server will be installed."
       (eglot-java--jdthandler-patch-eglot)
       (setq eglot-java-jdt-uri-handling-patch-applied t))
     (unless eglot-java-eglot-server-programs-manual-updates
+      ;; there are multiple allowed syntaxes for mode associations
       (let ((existing-java-related-assocs (mapcan (lambda (item)
                                                     (if (listp (car item))
                                                         (when (member 'java-mode (car item))
@@ -973,7 +1028,7 @@ DESTINATION-DIR is the directory where the LSP server will be installed."
 
 (defvar eglot-java-mode-map (make-sparse-keymap))
 
-(defun eglot-java--jdt-uri-handler (operation &rest args)
+(defun eglot-java--jdt-uri-handler (_operation &rest args)
   "Support Eclipse jdtls `jdt://' uri scheme."
   (let* ((uri (car args))
          (cache-dir (expand-file-name ".eglot-java" (temporary-file-directory)))
@@ -1031,6 +1086,32 @@ handle it. If it is not a jar call ORIGINAL-FN."
     (message "[eglot-java--jdthandler-patch-eglot] Eglot successfully patched.")))
 
 ;;;###autoload
+(defun eglot-java-upgrade-junit-jar ()
+"Upgrade the JUnit jar installation."
+(interactive)
+(let ((junit-jar-path (expand-file-name eglot-java-junit-platform-console-standalone-jar)))
+  (if (file-exists-p junit-jar-path)
+      (progn
+        (let* ((version-file-dir (file-name-directory junit-jar-path))
+               (version-file     (expand-file-name ".eglot-java-junit-version" version-file-dir)))
+            (if (file-exists-p version-file)
+                (progn
+                  (let* ((version-installed (eglot-java--file-read-trim version-file))
+                         (download-metadata (eglot-java--find-latest-junit-metadata eglot-java-maven-repo-root-url))
+                         (version-latest    (plist-get download-metadata :download-version)))                    
+                    (if (eglot-java--version< version-installed version-latest)
+                        (progn
+                          (message "Upgrading the JUnit jar from version %s to %s." version-installed version-latest)
+                          (eglot-java--upgrade-junit-jar junit-jar-path))
+                      (message "You're already running the latest JUnit jar version (%s)!" version-installed))))               
+              (progn
+                (when (yes-or-no-p "No previous JUnit jar version recorded! Do you want install the latest version?")
+                  (eglot-java--upgrade-junit-jar junit-jar-path))))))
+    (progn
+      (when (yes-or-no-p "No previous JUnit jar installation found! Do you want install the latest version?")
+        (eglot-java--install-junit-jar junit-jar-path))))))
+
+;;;###autoload
 (defun eglot-java-upgrade-lsp-server ()
   "Upgrade the LSP server installation."
   (interactive)
@@ -1050,10 +1131,10 @@ handle it. If it is not a jar call ORIGINAL-FN."
                           (eglot-java--upgrade-lsp-server install-dir))
                       (message "You're already running the latest LSP server version (%s)!" version-installed))))
               (progn
-                (when (yes-or-no-p "No previous LSP server version recorded. Do you want install the latest stable version?")
+                (when (yes-or-no-p "No previous LSP server version recorded! Do you want install the latest stable version?")
                   (eglot-java--upgrade-lsp-server install-dir))))))
       (progn
-        (when (yes-or-no-p "No previous LSP server installation found. Do you want install the latest stable version?")
+        (when (yes-or-no-p "No previous LSP server installation found! Do you want install the latest stable version?")
           (eglot-java--install-lsp-server install-dir))))))
 
 ;;;###autoload
