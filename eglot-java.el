@@ -1043,8 +1043,7 @@ handle it. If it is not a jar call ORIGINAL-FN."
                   (let* ((version-installed (eglot-java--file-read-trim lsp-server-versionfile))
                          (download-metadata (eglot-java--parse-jdtls-download-metadata
                                              (eglot-java--get-jdtls-download-metadata eglot-java-eclipse-jdt-ls-dl-metadata-url)))
-                         (version-latest    (plist-get download-metadata :download-version)))
-                    (message "version-latest: %s" download-metadata)
+                         (version-latest    (plist-get download-metadata :download-version)))                    
                     (if (version< version-installed version-latest)
                         (progn
                           (message "Upgrading the LSP server from version %s to %s." version-installed version-latest)
