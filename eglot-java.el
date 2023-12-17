@@ -63,7 +63,7 @@
 ;; - Otherwise, all the tests in the current file will be executed
 ;; 
 ;; You can upgrade an existing LSP server installation with the "eglot-java-upgrade-lsp-server" function.
-;;
+;; You can upgrade an existing JUnit jar installation with the "eglot-java-upgrade-junit-jar" function.
 
 ;;; Code:
 
