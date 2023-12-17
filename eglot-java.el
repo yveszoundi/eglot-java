@@ -58,6 +58,10 @@
 ;;   (define-key eglot-java-mode-map (kbd "C-c l T") #'eglot-java-project-build-task)
 ;;   (define-key eglot-java-mode-map (kbd "C-c l R") #'eglot-java-project-build-refresh)))
 ;;
+;; The behavior of the "eglot-java-run-test" function depends on the cursor location:
+;; - If there's an enclosing method at the current cursor location, that specific test method will run
+;; - Otherwise, all the tests in the current file will be executed
+;; 
 ;; You can upgrade an existing LSP server installation with the "eglot-java-upgrade-lsp-server" function.
 ;;
 
@@ -416,10 +420,73 @@ import org.junit.jupiter.api.Test;\n\npublic class %s {\n\n}")))
 
     (save-buffer)))
 
+(defun eglot-java--do-find-nearest-class-at-point (acc syms idx elt-type cursor-location)
+  "Find the nearest class at the current cursor location given a list of parameters.
+ACC represents the string accumulator holding the class name hierarchy, not prefixed with the package name.
+SYMS represents the document symbols.
+IDX represents the current index being traversed in the list of document symbols.
+ELT-TYPE represents the symbol type name to find, which is 'Class'.
+CURSOR-LOCATION represents a property list with the line information."
+  (if (> (length syms) idx)
+      (let* ((elt          (aref syms idx))
+             (elt-children (plist-get elt :children))
+             (elem-kind    (plist-get elt :kind))
+             (elem-type    (cdr (assoc elem-kind eglot--symbol-kind-names))))
+        (if (and (string= elem-type elt-type)
+                 (>= (plist-get cursor-location :line) (plist-get (plist-get (plist-get elt :selectionRange) :start) :line))
+                 (<= (plist-get cursor-location :line) (plist-get (plist-get (plist-get elt :range) :end)   :line)))
+            (let ((newacc (if acc
+                              (format "%s.%s" acc (plist-get elt :name))
+                            (plist-get elt :name))))
+              (eglot-java--do-find-nearest-class-at-point newacc elt-children 0 elt-type cursor-location))
+          (eglot-java--do-find-nearest-class-at-point acc syms (+ 1 idx) elt-type cursor-location)))
+    acc))
+
+(defun eglot-java--do-find-nearest-method-at-point (syms idx elt-type cursor-location)
+  "Find the nearest method at the current cursor location given a list of parameters.
+SYMS represents the document symbols.
+IDX represents the current index being traversed in the list of document symbols.
+ELT-TYPE represents the symbol type name to find which is 'Method'.
+CURSOR-LOCATION represents a property list with the line information."
+  (when (> (length syms) idx)
+    (let* ((elt          (aref syms idx))
+           (elt-children (plist-get elt :children))
+           (elem-kind    (plist-get elt :kind))
+           (elem-type    (cdr (assoc elem-kind eglot--symbol-kind-names))))
+      (if (and (string= elem-type elt-type)
+               (>= (plist-get cursor-location :line) (plist-get (plist-get (plist-get elt :selectionRange) :start) :line))
+               (<= (plist-get cursor-location :line) (plist-get (plist-get (plist-get elt :range) :end)   :line)))
+          (substring (plist-get elt :name)
+                     0
+                     (- (plist-get (plist-get (plist-get elt :selectionRange) :end)   :character)
+                        (plist-get (plist-get (plist-get elt :selectionRange) :start) :character)))
+        (let ((res (eglot-java--do-find-nearest-method-at-point elt-children 0 elt-type cursor-location)))
+          (if res
+              res
+            (eglot-java--do-find-nearest-method-at-point syms (+ 1 idx) elt-type cursor-location)))))))
+
+(defun eglot-java--find-nearest-method-at-point ()
+  "Find the nearest method at the current cursor location."
+  (let* ((syms          (eglot-java--document-symbols))
+         (line-current  (- (line-number-at-pos) 1))
+         (package-name  (eglot-java--symbol-value syms "Package"))
+         (class-name    (eglot-java--do-find-nearest-class-at-point nil syms 0 "Class" (list :line line-current))))
+    (when class-name
+      (let ((method-name (eglot-java--do-find-nearest-method-at-point syms 0 "Method" (list :line line-current))))
+        (when method-name
+          (format "%s%s%s#%s"
+                  package-name
+                  (if (= (length package-name) 0)
+                      ""
+                    ".")
+                  class-name
+                  method-name))))))
+
 (defun eglot-java-run-test ()
   "Run a test class."
   (interactive)
-  (let* ((fqcn                 (eglot-java--class-fqcn))
+  (let* ((fqcn                 (or (eglot-java--find-nearest-method-at-point)
+                                   (eglot-java--class-fqcn)))
          (cp                   (eglot-java--project-classpath (buffer-file-name) "test"))
          (current-file-is-test (not (equal ':json-false (eglot-java--file--test-p (buffer-file-name))))))
 
@@ -439,7 +506,7 @@ import org.junit.jupiter.api.Test;\n\npublic class %s {\n\n}")))
                  (mapconcat #'identity cp path-separator)
                  " ")
          t)
-      (user-error "No test found in current file! Is the file saved?" ))))
+      (user-error "No test found in current file! Is the file saved?"))))
 
 (defun eglot-java-run-main ()
   "Run a main class."
@@ -729,7 +796,7 @@ The buffer contains the raw HTTP response sent by the server."
 
 (defun eglot-java--get-jdtls-download-metadata(url)
   "Fetch the LSP server download metadata in JSON format.
-URL is the REST endpoint serving the download metadata in JSON format."  
+URL is the REST endpoint serving the download metadata in JSON format."
   (require 'json)
   (with-temp-buffer
     (url-insert-file-contents url)
@@ -742,12 +809,12 @@ URL is the REST endpoint serving the download metadata in JSON format."
   "Extract LSP server download metadata from a JSON response.
 METADATA is the JSON API response contents."
   (let ((jdtls-download-version (gethash "stable"
-                                          (gethash "versions"
-                                                   metadata)))
-         (jdtls-download-url (gethash "url"
-                                      (gethash "stable"
-                                               (gethash "urls"
-                                                        metadata)))))
+                                         (gethash "versions"
+                                                  metadata)))
+        (jdtls-download-url (gethash "url"
+                                     (gethash "stable"
+                                              (gethash "urls"
+                                                       metadata)))))
     (list `("download-version" . ,jdtls-download-version)
           `("download-url" . ,jdtls-download-url))))
 
@@ -767,7 +834,7 @@ INSTALL-DIR is the directory where the LSP server will be upgraded."
     (mkdir install-dir-tmp t)
     ;; shutdown folders associated to eglot-java-mode
     (dolist (buf buffers-managed)
-      (with-current-buffer buf              
+      (with-current-buffer buf
         (ignore-errors
           (eglot-java-mode -1))))
     ;; install the new version of the LSP server
@@ -812,9 +879,9 @@ DESTINATION-DIR is the directory where the LSP server will be installed."
     (message "Extracting Eclipse JDT LSP archive, please wait...")
     (let ((b (find-file dest-abspath)))
       (switch-to-buffer b)
-        (goto-char (point-min))
-        (tar-untar-buffer)
-        (kill-buffer b))
+      (goto-char (point-min))
+      (tar-untar-buffer)
+      (kill-buffer b))
     (delete-file dest-abspath)
 
     (let ((b (find-file dest-versionfile)))
@@ -935,11 +1002,11 @@ handle it. If it is not a jar call ORIGINAL-FN."
                     (if (version< version-installed version-latest)
                         (progn
                           (message "Upgrading the LSP server from version %s to %s." version-installed version-latest)
-                          (eglot-java--upgrade-lsp-server install-dir))                          
+                          (eglot-java--upgrade-lsp-server install-dir))
                       (message "You're already running the latest LSP server version (%s)!" version-installed))))
               (progn
                 (when (yes-or-no-p "No previous LSP server version recorded. Do you want install the latest stable version?")
-                    (eglot-java--upgrade-lsp-server install-dir))))))
+                  (eglot-java--upgrade-lsp-server install-dir))))))
       (progn
         (when (yes-or-no-p "No previous LSP server installation found. Do you want install the latest stable version?")
           (eglot-java--install-lsp-server install-dir))))))
@@ -955,7 +1022,7 @@ handle it. If it is not a jar call ORIGINAL-FN."
     (eglot-java--init)
     (if eglot-java-mode
         (eglot-java--ensure)
-      (ignore-errors                  
+      (ignore-errors
         (call-interactively 'eglot-shutdown)))))
 
 (provide 'eglot-java)
