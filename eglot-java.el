@@ -1,8 +1,8 @@
 ;;; eglot-java.el --- Java extension for the eglot LSP client  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2019-2023 Yves Zoundi
+;; Copyright (C) 2019-2024 Yves Zoundi
 
-;; Version: 1.13
+;; Version: 1.14
 ;; Author: Yves Zoundi <yves_zoundi@hotmail.com>
 ;; Maintainer: Yves Zoundi <yves_zoundi@hotmail.com>
 ;; URL: https://github.com/yveszoundi/eglot-java
@@ -100,9 +100,9 @@
   :type 'string
   :group 'eglot-java)
 
-(defcustom eglot-java-junit-platform-console-standalone-jar-url
-  "http://repository.sonatype.org/service/local/artifact/maven/redirect?r=central-proxy&g=org.junit.platform&a=junit-platform-console-standalone&v=LATEST"
-  "URL to download the latest JUnit platform standalone console jar."
+(defcustom eglot-java-maven-repo-root-url
+  "https://repo1.maven.org/maven2"
+  "Maven repository root URL."
   :type 'string
   :group 'eglot-java)
 
@@ -154,6 +154,7 @@
 (declare-function xml-get-children "xml" (node child-name))
 
 (make-obsolete-variable 'eglot-java-eclipse-jdt-ls-download-url 'eglot-java-eclipse-jdt-ls-dl-metadata-url "1.11")
+(make-obsolete-variable 'eglot-java-junit-platform-console-standalone-jar-url 'eglot-java-maven-repo-root-url "1.14")
 
 (defclass eglot-java-eclipse-jdt (eglot-lsp-server) ()
   :documentation "Eclipse's Java Development Tools Language Server.")
@@ -482,6 +483,51 @@ CURSOR-LOCATION represents a property list with the line information."
                   class-name
                   method-name))))))
 
+(defun eglot-java--record-version-info (ver-number dest-file)
+  (let ((b (find-file dest-file)))
+      (switch-to-buffer b)
+      (insert (format "%s\n" ver-number))
+      (save-buffer)
+      (kill-buffer b)))
+
+;; Implementation copied from https://stackoverflow.com/questions/13337969/how-do-i-parse-xml-from-a-url-in-emacs
+(defun eglot-java--parse-xml-buffer (&optional buffer)
+  "Extract HTTP response body from HTTP response, parse it as XML, and return a XML tree as list.
+BUFFER may be a buffer or the name of an existing buffer.
+If BUFFER is omitted, current-buffer is parsed."
+  (or buffer
+      (setq buffer (current-buffer)))
+  (set-buffer buffer)
+  (set-buffer-multibyte t)
+  (let ((start (save-excursion
+                 (goto-char (point-min))
+                 (and (re-search-forward "<\?xml" (point-max) t)
+                      (match-beginning 0)))))
+    (and start
+         (xml-parse-region start (point-max)))))
+
+(defun eglot-java--fetch-junit-latest-version (metadata-xml-url)
+  "Fetch the latest version for the Maven artifact junit-platform-console-standalone.
+METADATA-XML-URL is the Maven URL containing a maven-metadata.xml file for the artifact junit-platform-console-standalone."
+  (with-temp-buffer
+    (url-insert-file-contents metadata-xml-url)
+    (caddar (xml-get-children
+             (car (xml-get-children (car (eglot-java--parse-xml-buffer)) 'versioning))
+             'release))))
+
+(defun eglot-java--find-latest-junit-metadata (maven-repo-root-url)
+  "Returns the latest JUnit jar URL given a Maven repository root URL.
+  MAVEN-REPO-ROOT-URL The Maven repository URL such as https://repo1.maven.org/maven2."
+  (let* ((maven-root-url (if (string-match-p "/\\'" maven-repo-root-url)
+                            (format "%sorg/junit/platform/junit-platform-console-standalone" maven-repo-root-url)
+                          (format "%s/org/junit/platform/junit-platform-console-standalone" maven-repo-root-url)))
+         (junit-version (eglot-java--fetch-junit-latest-version (format "%s/%s" maven-root-url "maven-metadata.xml"))))
+    (list :download-version junit-version
+          :download-url     (format "%s/%s/junit-platform-console-standalone-%s.jar"
+                                    maven-root-url
+                                    junit-version
+                                    junit-version))))
+
 (defun eglot-java-run-test ()
   "Run a test class."
   (interactive)
@@ -489,11 +535,15 @@ CURSOR-LOCATION represents a property list with the line information."
                                    (eglot-java--class-fqcn)))
          (cp                   (eglot-java--project-classpath (buffer-file-name) "test"))
          (current-file-is-test (not (equal ':json-false (eglot-java--file--test-p (buffer-file-name))))))
-
     (unless (file-exists-p eglot-java-junit-platform-console-standalone-jar)
-      (eglot-java--download-file eglot-java-junit-platform-console-standalone-jar-url
-                                 eglot-java-junit-platform-console-standalone-jar))
-
+      (let ((download-metadata  (eglot-java--find-latest-junit-metadata eglot-java-maven-repo-root-url)))
+        (let ((download-version (plist-get download-metadata :download-version))
+              (download-url     (plist-get download-metadata :download-url))
+              (version-file-dir (file-name-directory (expand-file-name eglot-java-junit-platform-console-standalone-jar))))
+          (let ((version-file     (expand-file-name ".eglot-java-junit-version" version-file-dir)))
+            (eglot-java--download-file download-url
+                                       eglot-java-junit-platform-console-standalone-jar)
+            (eglot-java--record-version-info download-version version-file)))))
     (if current-file-is-test
         (compile
          (concat "java -jar "
@@ -520,7 +570,7 @@ CURSOR-LOCATION represents a property list with the line information."
                  " "
                  fqcn)
          t)
-      (user-error "No main method found in this file! Is the file saved?!"))))
+      (user-error "No main method found in this file! Is the file saved?"))))
 
 (defun eglot-java--class-fqcn ()
   "Return the fully qualified name of a given class."
@@ -811,12 +861,12 @@ METADATA is the JSON API response contents."
   (let ((jdtls-download-version (gethash "stable"
                                          (gethash "versions"
                                                   metadata)))
-        (jdtls-download-url (gethash "url"
-                                     (gethash "stable"
-                                              (gethash "urls"
-                                                       metadata)))))
-    (list `("download-version" . ,jdtls-download-version)
-          `("download-url" . ,jdtls-download-url))))
+        (jdtls-download-url     (gethash "url"
+                                         (gethash "stable"
+                                                  (gethash "urls"
+                                                           metadata)))))
+    (list :download-version jdtls-download-version
+          :download-url     jdtls-download-url)))
 
 (defun eglot-java--upgrade-lsp-server (install-dir)
   "Upgrade the LSP server installation in a given directory.
@@ -867,8 +917,8 @@ DESTINATION-DIR is the directory where the LSP server will be installed."
   (let* ((dest-dir                     (expand-file-name destination-dir))
          (download-metadata            (eglot-java--parse-jdtls-download-metadata
                                         (eglot-java--get-jdtls-download-metadata eglot-java-eclipse-jdt-ls-dl-metadata-url)))
-         (download-url                 (cdr (assoc "download-url" download-metadata)))
-         (download-version             (cdr (assoc "download-version" download-metadata)))
+         (download-url                 (plist-get download-metadata :download-url))
+         (download-version             (plist-get download-metadata :download-version))
          (dest-filename                (file-name-nondirectory download-url))
          (dest-abspath                 (expand-file-name dest-filename dest-dir))
          (dest-versionfile             (expand-file-name ".eglot-java-jdtls-version" dest-dir))
@@ -884,11 +934,7 @@ DESTINATION-DIR is the directory where the LSP server will be installed."
       (kill-buffer b))
     (delete-file dest-abspath)
 
-    (let ((b (find-file dest-versionfile)))
-      (switch-to-buffer b)
-      (insert (format "%s\n" download-version))
-      (save-buffer)
-      (kill-buffer b))
+    (eglot-java--record-version-info download-version dest-versionfile)
 
     (message "Eclipse JDT LSP server installed in folder \n\"%s\"." dest-dir)))
 
@@ -904,7 +950,6 @@ DESTINATION-DIR is the directory where the LSP server will be installed."
     (unless eglot-java-jdt-uri-handling-patch-applied
       (eglot-java--jdthandler-patch-eglot)
       (setq eglot-java-jdt-uri-handling-patch-applied t))
-
     (unless eglot-java-eglot-server-programs-manual-updates
       (let ((existing-java-related-assocs (mapcan (lambda (item)
                                                     (if (listp (car item))
@@ -998,7 +1043,8 @@ handle it. If it is not a jar call ORIGINAL-FN."
                   (let* ((version-installed (eglot-java--file-read-trim lsp-server-versionfile))
                          (download-metadata (eglot-java--parse-jdtls-download-metadata
                                              (eglot-java--get-jdtls-download-metadata eglot-java-eclipse-jdt-ls-dl-metadata-url)))
-                         (version-latest    (cdr (assoc "download-version" download-metadata))))
+                         (version-latest    (plist-get download-metadata :download-version)))
+                    (message "version-latest: %s" download-metadata)
                     (if (version< version-installed version-latest)
                         (progn
                           (message "Upgrading the LSP server from version %s to %s." version-installed version-latest)
