@@ -938,11 +938,11 @@ handle it. If it is not a jar call ORIGINAL-FN."
                           (eglot-java--upgrade-lsp-server install-dir))                          
                       (message "You're already running the latest LSP server version (%s)!" version-installed))))
               (progn
-                (if (yes-or-no-p "No previous LSP server version recorded. Do you want install the latest stable version?")
+                (when (yes-or-no-p "No previous LSP server version recorded. Do you want install the latest stable version?")
                     (eglot-java--upgrade-lsp-server install-dir))))))
       (progn
         (when (yes-or-no-p "No previous LSP server installation found. Do you want install the latest stable version?")
-            (eglot-java--install-lsp-server install-dir))))))
+          (eglot-java--install-lsp-server install-dir))))))
 
 ;;;###autoload
 (define-minor-mode eglot-java-mode
