@@ -789,8 +789,10 @@ INSTALL-DIR is the directory where the LSP server will be upgraded."
                 (with-current-buffer buf
                   (eglot-java-mode 1)))))
         (ignore-errors
-          ;; when the installation fails, delete the temporary installation directory
-          (delete-directory install-dir-tmp t))))))
+          (progn
+            (message "The LSP server upgrade failed!")
+            ;; when the installation fails, delete the temporary installation directory
+            (delete-directory install-dir-tmp t)))))))
 
 (defun eglot-java--install-lsp-server (destination-dir)
   "Install the Eclipse JDT LSP server.
@@ -936,9 +938,11 @@ handle it. If it is not a jar call ORIGINAL-FN."
                           (eglot-java--upgrade-lsp-server install-dir))                          
                       (message "You're already running the latest LSP server version (%s)!" version-installed))))
               (progn
-                (message "No previous LSP server version recorded, installing the latest stable version.")
-                (eglot-java--upgrade-lsp-server install-dir)))))
-      (eglot-java--install-lsp-server install-dir))))
+                (if (yes-or-no-p "No previous LSP server version recorded. Do you want install the latest stable version?")
+                    (eglot-java--upgrade-lsp-server install-dir))))))
+      (progn
+        (when (yes-or-no-p "No previous LSP server installation found. Do you want install the latest stable version?")
+            (eglot-java--install-lsp-server install-dir))))))
 
 ;;;###autoload
 (define-minor-mode eglot-java-mode
