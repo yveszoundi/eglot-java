@@ -69,6 +69,9 @@
 
 (require 'project)
 (require 'eglot)
+(require 'cl-lib)
+(require 'url)
+(require 'json)  
 
 (defgroup eglot-java
   nil
@@ -282,6 +285,7 @@ FILE-TO-READ is the file to parse."
     (replace-regexp-in-string "[:blank:]" ""
                               (replace-regexp-in-string "[\r\n|\n$]" ""
                                                         (buffer-string)))))
+
 (defun eglot-java--download-file (source-url dest-location)
   "Download a file from a URL at SOURCE-URL and save it to file at DEST-LOCATION."
   (let* ((dest-dir     (file-name-directory dest-location))
@@ -361,6 +365,7 @@ Otherwise the basename of the folder ROOT will be returned."
       (file-name-nondirectory (directory-file-name (file-name-directory build-file))))))
 
 (defun eglot-java--make-path (root-dir &rest path-elements)
+  "Compose a path from a base folder ROOT-DIR and a set of items PATH-ELEMENTS."
   (let ((new-path          (expand-file-name root-dir))
         (new-path-elements path-elements))
     (dolist (p new-path-elements)
@@ -378,7 +383,7 @@ Otherwise the basename of the folder ROOT will be returned."
   (eglot-execute-command
    (eglot--current-server-or-lose)
    "java.project.isTestFile"
-   (vector (eglot--path-to-uri file-path ))))
+   (vector (eglot--path-to-uri file-path))))
 
 (defun eglot-java--project-classpath (filename scope)
   "Return the classpath for a given FILENAME and SCOPE."
@@ -503,6 +508,7 @@ CURSOR-LOCATION represents a property list with the line information."
                   method-name))))))
 
 (defun eglot-java--record-version-info (ver-number dest-file)
+  "Store a version VER-NUMBER to a file DEST-FILE."
   (let ((b (find-file dest-file)))
       (switch-to-buffer b)
       (insert (format "%s\n" ver-number))
@@ -511,7 +517,7 @@ CURSOR-LOCATION represents a property list with the line information."
 
 ;; Implementation copied from https://stackoverflow.com/questions/13337969/how-do-i-parse-xml-from-a-url-in-emacs
 (defun eglot-java--parse-xml-buffer (&optional buffer)
-  "Extract HTTP response body from HTTP response, parse it as XML, and return a XML tree as list.
+  "Parse an XML buffer, and return a XML tree as list.
 BUFFER may be a buffer or the name of an existing buffer.
 If BUFFER is omitted, current-buffer is parsed."
   (or buffer
@@ -554,15 +560,13 @@ METADATA-XML-URL is the Maven URL containing a maven-metadata.xml file for the a
          (download-url      (plist-get download-metadata :download-url))
          (version-file-dir  (file-name-directory (expand-file-name junit-jar-path)))
          (version-file      (expand-file-name ".eglot-java-junit-version" version-file-dir)))
-    (eglot-java--download-file download-url
-                               (expand-file-name junit-jar-path))
+    (eglot-java--download-file download-url (expand-file-name junit-jar-path))
     (eglot-java--record-version-info download-version version-file)))
 
 (defun eglot-java-run-test ()
   "Run a test class."
   (interactive)
-  (let* ((fqcn                 (or (eglot-java--find-nearest-method-at-point)
-                                   (eglot-java--class-fqcn)))
+  (let* ((fqcn                 (or (eglot-java--find-nearest-method-at-point) (eglot-java--class-fqcn)))
          (cp                   (eglot-java--project-classpath (buffer-file-name) "test"))
          (current-file-is-test (not (equal ':json-false (eglot-java--file--test-p (buffer-file-name))))))
     (unless (file-exists-p (expand-file-name eglot-java-junit-platform-console-standalone-jar))
@@ -626,9 +630,8 @@ METADATA-XML-URL is the Maven URL containing a maven-metadata.xml file for the a
 
 (defun eglot-java--spring-initializr-fetch-json (url)
   "Retrieve the Spring initializr JSON model from a given URL."
-  (require 'url)
   (let ((url-request-method        "GET")
-        (url-request-extra-headers '(("Accept" . "application/vnd.initializr.v2.1+json")))
+        (url-request-extra-headers '(("Accept" . "application/vnd.initializr.v2.2+json")))
         (url-request-data          (mapconcat (lambda (arg)
                                                 (concat (url-hexify-string (car arg))
                                                         "="
@@ -640,7 +643,6 @@ METADATA-XML-URL is the Maven URL containing a maven-metadata.xml file for the a
 (defun eglot-java--spring-switch-to-url-buffer (_status)
   "Switch to the buffer returned by `url-retrieve'.
 The buffer contains the raw HTTP response sent by the server."
-  (require 'json)
   (let* ((json-object-type 'hash-table)
          (json-array-type  'list)
          (json-key-type    'string))
@@ -870,7 +872,6 @@ The buffer contains the raw HTTP response sent by the server."
 (defun eglot-java--get-jdtls-download-metadata (url)
   "Fetch the LSP server download metadata in JSON format.
 URL is the REST endpoint serving the download metadata in JSON format."
-  (require 'json)
   (with-temp-buffer
     (url-insert-file-contents url)
     (let ((json-object-type 'hash-table)
@@ -924,8 +925,7 @@ METADATA is the JSON API response contents."
 
 (defun eglot-java--upgrade-lsp-server (install-dir)
   "Upgrade the LSP server installation in a given directory.
-INSTALL-DIR is the directory where the LSP server will be upgraded."
-  (require 'cl-lib)
+INSTALL-DIR is the directory where the LSP server will be upgraded."  
   (let* ((buffers-managed (cl-loop for buf in (buffer-list)
                                    if (with-current-buffer buf
                                         (when eglot-java-mode
