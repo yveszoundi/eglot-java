@@ -11,18 +11,18 @@ This package provides additional Java programming language support for [[https:/
   - This installs the latest known milestone release (instead of the latest snapshot in earlier eglot-java versions)
   - This gives you code completion, refactoring capabilities, etc.
 
-|------------------------------------+-------------------------------------------------------------------------|
-| Function                           | Description                                                             |
-|------------------------------------+-------------------------------------------------------------------------|
-| =eglot-java-project-new=           | Create new projects with a wizard ([[https://start.spring.io/][spring]], [[https://maven.apache.org/][Maven]] or [[https://gradle.org/][Gradle]] projects)    |
-| =eglot-java-project-build-refresh= | Rebuild the current project                                             |
-| =eglot-java-project-build-task=    | Run a build task using [[https://gradle.org/][Gradle]] or [[https://maven.apache.org/][Maven]] for the current project          |
-| =eglot-java-file-new=              | Wizard for creating new Java files                                      |
-| =eglot-java-run-main=              | Run the current main class                                              |
-| =eglot-java-run-test=              | Run the current test ([[https://junit.org/junit5/][JUnit]] only, unless you run Maven or Gradle tasks) |
-| =eglot-java-upgrade-lsp-server=    | Upgrade the LSP server installation                                     |
-| =eglot-java-upgrade-junit-jar=     | Upgrade the JUnit jar installation                                      |
-|------------------------------------+-------------------------------------------------------------------------|
+|------------------------------------+-------------------------------------------------------------------------+----------|
+| Function                           | Description                                                             | Autoload |
+|------------------------------------+-------------------------------------------------------------------------+----------|
+| =eglot-java-project-new=           | Create new projects with a wizard ([[https://start.spring.io/][Spring]], [[https://maven.apache.org/][Maven]] or [[https://gradle.org/][Gradle]] projects)    | NO       |
+| =eglot-java-project-build-refresh= | Rebuild the current project                                             | NO       |
+| =eglot-java-project-build-task=    | Run a build task using [[https://gradle.org/][Gradle]] or [[https://maven.apache.org/][Maven]] for the current project          | NO       |
+| =eglot-java-file-new=              | Wizard for creating new Java files                                      | NO       |
+| =eglot-java-run-main=              | Run the current main class                                              | NO       |
+| =eglot-java-run-test=              | Run the current test ([[https://junit.org/junit5/][JUnit]] only, unless you run Maven or Gradle tasks) | NO       |
+| =eglot-java-upgrade-lsp-server=    | Upgrade the LSP server installation                                     | YES      |
+| =eglot-java-upgrade-junit-jar=     | Upgrade the JUnit jar installation                                      | YES      |
+|------------------------------------+-------------------------------------------------------------------------+----------|
 
 * Dependencies
 
