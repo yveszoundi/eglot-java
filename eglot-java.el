@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2019-2024 Yves Zoundi
 
-;; Version: 1.18
+;; Version: 1.19
 ;; Author: Yves Zoundi <yves_zoundi@hotmail.com>
 ;; Maintainer: Yves Zoundi <yves_zoundi@hotmail.com>
 ;; URL: https://github.com/yveszoundi/eglot-java
@@ -428,7 +428,7 @@ Otherwise the basename of the folder ROOT will be returned."
     (eglot-java--project-name-maven root)))
 
 (defun eglot-java--file--test-p (file-path)
-  "Tell if a file locate at FILE-PATH is a test class."
+  "Tell if a file located at FILE-PATH is a test class."
   (eglot-execute-command
    (eglot--current-server-or-lose)
    "java.project.isTestFile"
@@ -677,7 +677,7 @@ METADATA-XML-URL is the Maven URL containing a maven-metadata.xml file for the a
    :textDocument/documentSymbol
    (list :textDocument (list :uri (eglot--path-to-uri (buffer-file-name))))))
 
-(defun eglot-java--spring-initializr-fetch-json (url)
+(defun eglot-java--get-spring-initializr-json (url)
   "Retrieve the Spring initializr JSON model from a given URL."
   (let ((url-request-method        "GET")
         (url-request-extra-headers '(("Accept" . "application/vnd.initializr.v2.2+json")))
@@ -687,29 +687,7 @@ METADATA-XML-URL is the Maven URL containing a maven-metadata.xml file for the a
                                                         (url-hexify-string (cdr arg))))
                                               (list)
                                               "&")))
-    (url-retrieve url 'eglot-java--spring-switch-to-url-buffer)))
-
-(defun eglot-java--spring-switch-to-url-buffer (_status)
-  "Switch to the buffer returned by `url-retrieve'.
-The buffer contains the raw HTTP response sent by the server."
-  (let* ((json-object-type 'hash-table)
-         (json-array-type  'list)
-         (json-key-type    'string))
-    (setq eglot-java-spring-starter-jsontext (json-read-from-string
-                                              (eglot-java--buffer-whole-string (current-buffer))))
-    (kill-buffer)))
-
-(defun eglot-java--buffer-whole-string (buffer)
-  "Retrieve the text contents from an HTTP response BUFFER."
-  (with-current-buffer buffer
-    (save-restriction
-      (widen)
-      (re-search-forward "^$")
-      (buffer-substring-no-properties (point) (point-max)))))
-
-(defun eglot-java--spring-read-json ()
-  "Fetch the JSON model for creating Spring projects via spring initializr."
-  (eglot-java--spring-initializr-fetch-json eglot-java-spring-starter-url-projectdef))
+    (eglot-java--read-json-from-url url)))
 
 (defun eglot-java-project-new ()
   "Create a new Java project."
@@ -785,10 +763,9 @@ The buffer contains the raw HTTP response sent by the server."
 (defun eglot-java--project-new-spring ()
   "Create a new Spring java project using spring initializr. User input parameters are extracted from the JSON structure."
   (unless eglot-java-spring-starter-jsontext
-    (eglot-java--spring-read-json)
-    (while (not eglot-java-spring-starter-jsontext)
-      (sleep-for 1)
-      (message "Downloading spring initializr JSON data...")))
+    (message "Downloading spring initializr JSON data...")
+    (setq eglot-java-spring-starter-jsontext
+          (eglot-java--get-spring-initializr-json eglot-java-spring-starter-url-projectdef)))
 
   (let* ((elems         (cl-remove-if
                          (lambda (node-name)
@@ -914,7 +891,7 @@ The buffer contains the raw HTTP response sent by the server."
                            (expand-file-name build-filename project-dir))
                           goal))))
 
-(defun eglot-java--get-jdtls-download-metadata (url)
+(defun eglot-java--read-json-from-url (url)
   "Fetch the LSP server download metadata in JSON format.
 URL is the REST endpoint serving the download metadata in JSON format."
   (with-temp-buffer
@@ -1013,7 +990,7 @@ INSTALL-DIR is the directory where the LSP server will be upgraded."
 DESTINATION-DIR is the directory where the LSP server will be installed."
   (let* ((dest-dir                     (expand-file-name destination-dir))
          (download-metadata            (eglot-java--parse-jdtls-download-metadata
-                                        (eglot-java--get-jdtls-download-metadata eglot-java-eclipse-jdt-ls-dl-metadata-url)))
+                                        (eglot-java--read-json-from-url eglot-java-eclipse-jdt-ls-dl-metadata-url)))
          (download-url                 (plist-get download-metadata :download-url))
          (download-version             (plist-get download-metadata :download-version))
          (dest-filename                (file-name-nondirectory download-url))
@@ -1166,7 +1143,7 @@ handle it. If it is not a jar call ORIGINAL-FN."
                 (progn
                   (let* ((version-installed (eglot-java--file-read-trim lsp-server-versionfile))
                          (download-metadata (eglot-java--parse-jdtls-download-metadata
-                                             (eglot-java--get-jdtls-download-metadata eglot-java-eclipse-jdt-ls-dl-metadata-url)))
+                                             (eglot-java--read-json-from-url eglot-java-eclipse-jdt-ls-dl-metadata-url)))
                          (version-latest    (plist-get download-metadata :download-version)))
                     (if (eglot-java--version< version-installed version-latest)
                         (progn
