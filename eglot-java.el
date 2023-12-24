@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2019-2024 Yves Zoundi
 
-;; Version: 1.17
+;; Version: 1.18
 ;; Author: Yves Zoundi <yves_zoundi@hotmail.com>
 ;; Maintainer: Yves Zoundi <yves_zoundi@hotmail.com>
 ;; URL: https://github.com/yveszoundi/eglot-java
@@ -126,6 +126,7 @@
   "https://formulae.brew.sh/api/formula/jdtls.json"
   "URL to fetch Eclipse JDT language server packaging information."
   :type 'string
+  :risky t
   :group 'eglot-java)
 
 (defcustom eglot-java-maven-repo-root-url
@@ -194,7 +195,7 @@
 - Check if eglot-java-java-home is set and use eglot-java-java-home/bin/java
 - Check if JAVA_HOME is set and use JAVA_HOME/bin/java"
   (if eglot-java-java-program
-      eglot-eglot-java-java-program
+      eglot-java-java-program
     (let ((java-executable (executable-find "java"))
           (java-home       (or eglot-java-java-home (getenv "JAVA_HOME"))))
       (if java-executable
@@ -221,10 +222,10 @@ This allows additional suffixes in versions for milestones or snapshots. e.g., 1
         t
       (when (and (version= first-v1 first-v2)
                  (not (string= last-v1 last-v2)))
-          (if (string= "" last-v2)
-              t
-            (when (not (string= "" last-v1))
-              (string< last-v1 last-v2)))))))
+        (if (string= "" last-v2)
+            t
+          (when (not (string= "" last-v1))
+            (string< last-v1 last-v2)))))))
 
 (cl-defmethod eglot-initialization-options ((server eglot-java-eclipse-jdt))
   "Passes through required jdt initialization options."
@@ -507,7 +508,7 @@ CURSOR-LOCATION represents a property list with the line information."
              (elem-type    (cdr (assoc elem-kind eglot--symbol-kind-names))))
         (if (and (string= elem-type elt-type)
                  (>= (plist-get cursor-location :line) (plist-get (plist-get (plist-get elt :selectionRange) :start) :line))
-                 (<= (plist-get cursor-location :line) (plist-get (plist-get (plist-get elt :range) :end)   :line)))
+                 (<= (plist-get cursor-location :line) (plist-get (plist-get (plist-get elt :range) :end) :line)))
             (let ((newacc (if acc
                               (format "%s.%s" acc (plist-get elt :name))
                             (plist-get elt :name))))
@@ -722,23 +723,19 @@ The buffer contains the raw HTTP response sent by the server."
         (mvn-group-id              (read-string         "Enter group id: "))
         (mvn-artifact-id           (read-string         "Enter artifact id: "))
         (mvn-archetype-artifact-id (read-string         "Enter archetype artifact id: " "maven-archetype-quickstart")))
+    (let* ((b        (eglot-java--build-run mvn-project-parent-dir
+                                            (eglot-java--build-executable "mvn" "mvnw" mvn-project-parent-dir)
+                                            (concat " archetype:generate "
+                                                    " -DgroupId=" mvn-group-id
+                                                    " -DartifactId=" mvn-artifact-id
+                                                    " -DarchetypeArtifactId=" mvn-archetype-artifact-id
+                                                    " -DinteractiveMode=false")))
+           (dest-dir (expand-file-name mvn-artifact-id mvn-project-parent-dir))
+           (p        (get-buffer-process b)))
+      (with-current-buffer b
+        (setq eglot-java-project-new-directory dest-dir))
 
-    (let ((b
-           (eglot-java--build-run
-            mvn-project-parent-dir
-            (eglot-java--build-executable "mvn" "mvnw" mvn-project-parent-dir)
-            (concat " archetype:generate "
-                    " -DgroupId=" mvn-group-id
-                    " -DartifactId=" mvn-artifact-id
-                    " -DarchetypeArtifactId=" mvn-archetype-artifact-id
-                    " -DinteractiveMode=false"))))
-
-      (let ((dest-dir (expand-file-name mvn-artifact-id mvn-project-parent-dir))
-            (p        (get-buffer-process b)))
-        (with-current-buffer b
-          (setq eglot-java-project-new-directory dest-dir))
-
-        (set-process-sentinel p #'eglot-java--project-new-process-sentinel)))))
+      (set-process-sentinel p #'eglot-java--project-new-process-sentinel))))
 
 (defun eglot-java--project-new-gradle ()
   "Create a new Gradle project."
@@ -1171,7 +1168,7 @@ handle it. If it is not a jar call ORIGINAL-FN."
                          (download-metadata (eglot-java--parse-jdtls-download-metadata
                                              (eglot-java--get-jdtls-download-metadata eglot-java-eclipse-jdt-ls-dl-metadata-url)))
                          (version-latest    (plist-get download-metadata :download-version)))
-                    (if (version< version-installed version-latest)
+                    (if (eglot-java--version< version-installed version-latest)
                         (progn
                           (message "Upgrading the JDT LSP server from version %s to %s." version-installed version-latest)
                           (eglot-java--upgrade-lsp-server install-dir))
