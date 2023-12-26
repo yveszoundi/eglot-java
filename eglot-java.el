@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2019-2024 Yves Zoundi
 
-;; Version: 1.19
+;; Version: 1.20
 ;; Author: Yves Zoundi <yves_zoundi@hotmail.com>
 ;; Maintainer: Yves Zoundi <yves_zoundi@hotmail.com>
 ;; URL: https://github.com/yveszoundi/eglot-java
@@ -366,9 +366,8 @@ Otherwise returns nil"
                                                             nil
                                                             "^org.eclipse.equinox.launcher_.*.jar$"
                                                             t))))
-    (if (not equinox-launcher-jar)
-        (user-error "Could not find Eclipse OSGI jar launcher!"))
-
+    (when (not equinox-launcher-jar)
+      (user-error "Could not find Eclipse OSGI jar launcher!"))
     (expand-file-name equinox-launcher-jar
                       lsp-java-server-plugins-dir)))
 
@@ -622,7 +621,8 @@ METADATA-XML-URL is the Maven URL containing a maven-metadata.xml file for the a
       (eglot-java--install-junit-jar eglot-java-junit-platform-console-standalone-jar))
     (if current-file-is-test
         (compile
-         (concat "java -jar "
+         (concat (eglot-java--find-java-program-from-alternatives)
+                 " -jar "
                  eglot-java-junit-platform-console-standalone-jar
                  (if (string-match-p "#" fqcn)
                      " -m "
@@ -641,7 +641,8 @@ METADATA-XML-URL is the Maven URL containing a maven-metadata.xml file for the a
          (cp   (eglot-java--project-classpath (buffer-file-name) "runtime")))
     (if fqcn
         (compile
-         (concat "java -cp "
+         (concat (eglot-java--find-java-program-from-alternatives)
+                 " -cp "
                  (mapconcat #'identity cp path-separator)
                  " "
                  fqcn)
@@ -857,16 +858,17 @@ METADATA-XML-URL is the Maven URL containing a maven-metadata.xml file for the a
          (build-file (if (eglot-java--project-gradle-p root)
                          (expand-file-name eglot-java-build-filename-gradle (file-name-as-directory root))
                        (expand-file-name eglot-java-build-filename-maven (file-name-as-directory root)))))
-    (when (file-exists-p build-file)
-      (progn
+    
+    (progn
+      (when (file-exists-p build-file)
         (jsonrpc-notify
          (eglot--current-server-or-lose)
          :java/projectConfigurationUpdate
-         (list :uri (eglot--path-to-uri build-file)))
-        (jsonrpc-notify
-         (eglot--current-server-or-lose)
-         :java/buildWorkspace
-         '((:json-false)))))))
+         (list :uri (eglot--path-to-uri build-file))))
+      (jsonrpc-notify
+       (eglot--current-server-or-lose)
+       :java/buildWorkspace
+       '((:json-false))))))
 
 (defun eglot-java-project-build-task ()
   "Run a new build task."
@@ -1016,7 +1018,7 @@ DESTINATION-DIR is the directory where the LSP server will be installed."
   "Install the LSP server as needed and then turn-on eglot."
   (unless (file-exists-p (expand-file-name eglot-java-server-install-dir))
     (eglot-java--install-lsp-server eglot-java-server-install-dir))
-  (call-interactively 'eglot))
+  (eglot-ensure))
 
 (defun eglot-java--init ()
   "Initialize the library for use with the Eclipse JDT language server."
