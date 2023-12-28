@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2019-2024 Yves Zoundi
 
-;; Version: 1.20
+;; Version: 1.21
 ;; Author: Yves Zoundi <yves_zoundi@hotmail.com>
 ;; Maintainer: Yves Zoundi <yves_zoundi@hotmail.com>
 ;; URL: https://github.com/yveszoundi/eglot-java
@@ -172,8 +172,10 @@
   :type 'string
   :group 'eglot-java)
 
-(defconst eglot-java-build-filename-maven  "pom.xml"      "Maven build file name.")
-(defconst eglot-java-build-filename-gradle "build.gradle" "Gradle build file name.")
+(defconst eglot-java-filename-build-maven   "pom.xml"                   "Maven build file name.")
+(defconst eglot-java-filename-build-gradle  "build.gradle"              "Gradle build file name.")
+(defconst eglot-java-filename-version-jdtls ".eglot-java-jdtls-version" "JDT LS version file name.")
+(defconst eglot-java-filename-version-junit ".eglot-java-junit-version" "JDT LS version file name.")
 
 (defvar eglot-java-spring-starter-jsontext nil "Spring IO JSON payload.")
 (defvar eglot-java-project-new-directory nil "The newly created java project directory location.")
@@ -347,9 +349,9 @@ FILE-TO-READ is the file to parse."
 (defun eglot-java--project-try (dir)
   "Return project instance if DIR is part of a Java project.
 Otherwise returns nil"
-  (let ((root (or (locate-dominating-file dir eglot-java-build-filename-maven)
+  (let ((root (or (locate-dominating-file dir eglot-java-filename-build-maven)
                   (locate-dominating-file dir ".project")
-                  (locate-dominating-file dir eglot-java-build-filename-gradle))))
+                  (locate-dominating-file dir eglot-java-filename-build-gradle))))
     (and root (cons 'java root))))
 
 (cl-defmethod project-root ((project (head java)))
@@ -382,14 +384,14 @@ Otherwise returns nil"
 (defun eglot-java--project-name-maven (root)
   "Return the name of a Maven project in the folder ROOT.
 This extracts the project name from the Maven POM (artifactId)."
-  (let* ((pom    (expand-file-name eglot-java-build-filename-maven root))
+  (let* ((pom    (expand-file-name eglot-java-filename-build-maven root))
          (xml    (xml-parse-file pom))
          (parent (car xml)))
     (caddar (xml-get-children parent 'artifactId))))
 
 (defun eglot-java--project-gradle-p (root)
   "Check if a project stored in the folder ROOT is using Gradle as build tool."
-  (file-exists-p (expand-file-name eglot-java-build-filename-gradle
+  (file-exists-p (expand-file-name eglot-java-filename-build-gradle
                                    (file-name-as-directory root))))
 
 (defun eglot-java--project-name-gradle (root)
@@ -607,7 +609,7 @@ METADATA-XML-URL is the Maven URL containing a maven-metadata.xml file for the a
          (download-version  (plist-get download-metadata :download-version))
          (download-url      (plist-get download-metadata :download-url))
          (version-file-dir  (file-name-directory (expand-file-name junit-jar-path)))
-         (version-file      (expand-file-name ".eglot-java-junit-version" version-file-dir)))
+         (version-file      (expand-file-name eglot-java-filename-version-junit version-file-dir)))
     (eglot-java--download-file download-url (expand-file-name junit-jar-path))
     (eglot-java--record-version-info download-version version-file)))
 
@@ -856,8 +858,8 @@ METADATA-XML-URL is the Maven URL containing a maven-metadata.xml file for the a
   (interactive)
   (let* ((root       (cdr (project-current)))
          (build-file (if (eglot-java--project-gradle-p root)
-                         (expand-file-name eglot-java-build-filename-gradle (file-name-as-directory root))
-                       (expand-file-name eglot-java-build-filename-maven (file-name-as-directory root)))))
+                         (expand-file-name eglot-java-filename-build-gradle (file-name-as-directory root))
+                       (expand-file-name eglot-java-filename-build-maven (file-name-as-directory root)))))
     
     (progn
       (when (file-exists-p build-file)
@@ -877,8 +879,8 @@ METADATA-XML-URL is the Maven URL containing a maven-metadata.xml file for the a
          (goal                      (read-string "Task & Parameters: " "test"))
          (project-is-gradle-project (eglot-java--project-gradle-p project-dir))
          (build-filename            (if project-is-gradle-project
-                                        eglot-java-build-filename-gradle
-                                      eglot-java-build-filename-maven))
+                                        eglot-java-filename-build-gradle
+                                      eglot-java-filename-build-maven))
          (build-filename-flag       (if project-is-gradle-project
                                         "-b"
                                       "-f"))
@@ -997,7 +999,7 @@ DESTINATION-DIR is the directory where the LSP server will be installed."
          (download-version             (plist-get download-metadata :download-version))
          (dest-filename                (file-name-nondirectory download-url))
          (dest-abspath                 (expand-file-name dest-filename dest-dir))
-         (dest-versionfile             (expand-file-name ".eglot-java-jdtls-version" dest-dir))
+         (dest-versionfile             (expand-file-name eglot-java-filename-version-jdtls dest-dir))
          (large-file-warning-threshold nil))
     (message "Installing Eclipse JDT LSP server, please wait...")
     (eglot-java--download-file download-url dest-abspath)
@@ -1115,7 +1117,7 @@ handle it. If it is not a jar call ORIGINAL-FN."
     (if (file-exists-p junit-jar-path)
         (progn
           (let* ((version-file-dir (file-name-directory junit-jar-path))
-                 (version-file     (expand-file-name ".eglot-java-junit-version" version-file-dir)))
+                 (version-file     (expand-file-name eglot-java-filename-version-junit version-file-dir)))
             (if (file-exists-p version-file)
                 (progn
                   (let* ((version-installed (eglot-java--file-read-trim version-file))
@@ -1140,7 +1142,7 @@ handle it. If it is not a jar call ORIGINAL-FN."
   (let ((install-dir (expand-file-name eglot-java-server-install-dir)))
     (if (file-exists-p install-dir)
         (progn
-          (let ((lsp-server-versionfile (expand-file-name ".eglot-java-jdtls-version" install-dir)))
+          (let ((lsp-server-versionfile (expand-file-name eglot-java-filename-version-jdtls install-dir)))
             (if (file-exists-p lsp-server-versionfile)
                 (progn
                   (let* ((version-installed (eglot-java--file-read-trim lsp-server-versionfile))
