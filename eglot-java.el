@@ -175,7 +175,7 @@
 (defconst eglot-java-filename-build-maven   "pom.xml"                   "Maven build file name.")
 (defconst eglot-java-filename-build-gradle  "build.gradle"              "Gradle build file name.")
 (defconst eglot-java-filename-version-jdtls ".eglot-java-jdtls-version" "JDT LS version file name.")
-(defconst eglot-java-filename-version-junit ".eglot-java-junit-version" "JDT LS version file name.")
+(defconst eglot-java-filename-version-junit ".eglot-java-junit-version" "JUnit version file name.")
 
 (defvar eglot-java-spring-starter-jsontext nil "Spring IO JSON payload.")
 (defvar eglot-java-project-new-directory nil "The newly created java project directory location.")
