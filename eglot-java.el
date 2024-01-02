@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2019-2024 Yves Zoundi
 
-;; Version: 1.21
+;; Version: 1.22
 ;; Author: Yves Zoundi <yves_zoundi@hotmail.com>
 ;; Maintainer: Yves Zoundi <yves_zoundi@hotmail.com>
 ;; URL: https://github.com/yveszoundi/eglot-java
@@ -24,7 +24,7 @@
 
 ;;; Commentary:
 
-;; Java extension for eglot.
+;; Java extension for the eglot LSP client.
 ;;
 ;; Some of the key features include the following:
 ;; - Automatic installation of the Eclipse JDT LSP server (latest milestone release).
@@ -50,13 +50,13 @@
 ;; Below is a sample configuration for your emacs init file
 ;;
 ;; (add-hook 'java-mode-hook 'eglot-java-mode)
-;; (add-hook 'eglot-java-mode-hook (lambda ()
+;; (with-eval-after-load 'eglot-java
 ;;   (define-key eglot-java-mode-map (kbd "C-c l n") #'eglot-java-file-new)
 ;;   (define-key eglot-java-mode-map (kbd "C-c l x") #'eglot-java-run-main)
 ;;   (define-key eglot-java-mode-map (kbd "C-c l t") #'eglot-java-run-test)
 ;;   (define-key eglot-java-mode-map (kbd "C-c l N") #'eglot-java-project-new)
 ;;   (define-key eglot-java-mode-map (kbd "C-c l T") #'eglot-java-project-build-task)
-;;   (define-key eglot-java-mode-map (kbd "C-c l R") #'eglot-java-project-build-refresh)))
+;;   (define-key eglot-java-mode-map (kbd "C-c l R") #'eglot-java-project-build-refresh))
 ;;
 ;; The behavior of the "eglot-java-run-test" function depends on the cursor location:
 ;; - If there's an enclosing method at the current cursor location, that specific test method will run
@@ -172,10 +172,11 @@
   :type 'string
   :group 'eglot-java)
 
-(defconst eglot-java-filename-build-maven   "pom.xml"                   "Maven build file name.")
-(defconst eglot-java-filename-build-gradle  "build.gradle"              "Gradle build file name.")
-(defconst eglot-java-filename-version-jdtls ".eglot-java-jdtls-version" "JDT LS version file name.")
-(defconst eglot-java-filename-version-junit ".eglot-java-junit-version" "JUnit version file name.")
+(defconst eglot-java-filename-build-maven          "pom.xml"                   "Maven build file name.")
+(defconst eglot-java-filename-build-gradle-groovy  "build.gradle"              "Gradle build file name with Groovy.")
+(defconst eglot-java-filename-build-gradle-kotlin  "build.gradle.kts"          "Gradle build file name with Kotlin.")
+(defconst eglot-java-filename-version-jdtls        ".eglot-java-jdtls-version" "JDT LS version file name.")
+(defconst eglot-java-filename-version-junit        ".eglot-java-junit-version" "JUnit version file name.")
 
 (defvar eglot-java-spring-starter-jsontext nil "Spring IO JSON payload.")
 (defvar eglot-java-project-new-directory nil "The newly created java project directory location.")
@@ -184,8 +185,8 @@
 (declare-function tar-untar-buffer "tar-mode" ())
 (declare-function xml-get-children "xml" (node child-name))
 
-(make-obsolete-variable 'eglot-java-eclipse-jdt-ls-download-url 'eglot-java-eclipse-jdt-ls-dl-metadata-url "1.11")
-(make-obsolete-variable 'eglot-java-junit-platform-console-standalone-jar-url 'eglot-java-maven-repo-root-url "1.14")
+(make-obsolete-variable 'eglot-java-eclipse-jdt-ls-download-url               'eglot-java-eclipse-jdt-ls-dl-metadata-url "1.11")
+(make-obsolete-variable 'eglot-java-junit-platform-console-standalone-jar-url 'eglot-java-maven-repo-root-url            "1.14")
 
 (defclass eglot-java-eclipse-jdt (eglot-lsp-server) ()
   :documentation "Eclipse's Java Development Tools Language Server.")
@@ -231,7 +232,7 @@ This allows additional suffixes in versions for milestones or snapshots. e.g., 1
 
 (cl-defmethod eglot-initialization-options ((server eglot-java-eclipse-jdt))
   "Passes through required jdt initialization options."
-  ;; TODO Allow hooks for settings such as extendedClientCapabilities
+  ;; TODO Allow hooks for settings such as extendedClientCapabilities  
   `(:extendedClientCapabilities (:classFileContentsSupport t)
                                 :workspaceFolders
                                 [,@(cl-delete-duplicates
@@ -241,9 +242,10 @@ This allows additional suffixes in versions for milestones or snapshots. e.g., 1
                                                     (mapcar
                                                      #'file-name-directory
                                                      (append
-                                                      (file-expand-wildcards (concat root "*/pom.xml"))
-                                                      (file-expand-wildcards (concat root "*/build.gradle"))
-                                                      (file-expand-wildcards (concat root "*/.project")))))))
+                                                      (file-expand-wildcards (concat root "/*" eglot-java-filename-build-maven))
+                                                      (file-expand-wildcards (concat root "/*" eglot-java-filename-build-gradle-groovy))
+                                                      (file-expand-wildcards (concat root "/*" eglot-java-filename-build-gradle-kotlin))
+                                                      (file-expand-wildcards (concat root "/.project")))))))
                                     :test #'string=)]
 
                                 ,@(if-let ((home (or eglot-java-java-home
@@ -351,7 +353,8 @@ FILE-TO-READ is the file to parse."
 Otherwise returns nil"
   (let ((root (or (locate-dominating-file dir eglot-java-filename-build-maven)
                   (locate-dominating-file dir ".project")
-                  (locate-dominating-file dir eglot-java-filename-build-gradle))))
+                  (locate-dominating-file dir eglot-java-filename-build-gradle-groovy)
+                  (locate-dominating-file dir eglot-java-filename-build-gradle-kotlin))))
     (and root (cons 'java root))))
 
 (cl-defmethod project-root ((project (head java)))
@@ -391,27 +394,36 @@ This extracts the project name from the Maven POM (artifactId)."
 
 (defun eglot-java--project-gradle-p (root)
   "Check if a project stored in the folder ROOT is using Gradle as build tool."
-  (file-exists-p (expand-file-name eglot-java-filename-build-gradle
-                                   (file-name-as-directory root))))
+  (or (file-exists-p (expand-file-name eglot-java-filename-build-gradle-groovy
+                                       (file-name-as-directory root)))
+      (file-exists-p (expand-file-name eglot-java-filename-build-gradle-kotlin
+                                       (file-name-as-directory root)))))
 
 (defun eglot-java--project-name-gradle (root)
   "Return the name of a Gradle project in the folder ROOT.
 If a settings.gradle file exists, it'll be parsed to extract the project name.
 Otherwise the basename of the folder ROOT will be returned."
-  (let ((build-file (expand-file-name "settings.gradle" root)))
+  (let* ((build-file-groovy (expand-file-name "settings.gradle" root))
+         (build-file-kotlin (expand-file-name "settings.gradle.kts" root))
+         (build-file (if (file-exists-p build-file-groovy)
+                         build-file-groovy
+                       build-file-kotlin)))
     (if (file-exists-p build-file)
-        (let* ((build           (expand-file-name "settings.gradle" root))
-               (gradle-settings (with-temp-buffer
-                                  (insert-file-contents build)
-                                  (goto-char (point-min))
-                                  (search-forward "rootProject.name")
-                                  (search-forward "=")
-                                  (buffer-substring (point) (line-end-position)))))
-          (string-trim (cl-reduce
-                        (lambda (acc item)
-                          (replace-regexp-in-string item "" acc))
-                        '("'" "\"")
-                        :initial-value gradle-settings)))
+        (let ((gradle-settings (condition-case nil
+                                   (with-temp-buffer
+                                     (insert-file-contents build-file)
+                                     (goto-char (point-min))
+                                     (search-forward "rootProject.name")
+                                     (search-forward "=")
+                                     (buffer-substring (point) (line-end-position)))
+                                 (error nil))))
+          (if gradle-settings
+              (string-trim (cl-reduce
+                            (lambda (acc item)
+                              (replace-regexp-in-string item "" acc))
+                            '("'" "\"")
+                            :initial-value gradle-settings))
+            (file-name-nondirectory (directory-file-name (file-name-directory build-file)))))
       (file-name-nondirectory (directory-file-name (file-name-directory build-file))))))
 
 (defun eglot-java--make-path (root-dir &rest path-elements)
@@ -447,9 +459,10 @@ Otherwise the basename of the folder ROOT will be returned."
   "Create a new class."
   (interactive)
   (let* ((class-by-type     #s(hash-table
-                               size 5
+                               size 6
                                test equal
                                data ("Class"      "public class %s {\n\n}"
+                                     "Record"     "public record %s () {}"
                                      "Enum"       "public enum %s {\n\n}"
                                      "Interface"  "public interface %s {\n\n}"
                                      "Annotation" "public @interface %s {\n\n}"
@@ -478,21 +491,16 @@ import org.junit.jupiter.api.Test;\n\npublic class %s {\n\n}")))
                               (mapconcat #'identity new-paths "/")
                               (plist-get selected-source :path))))
          (simple-class-name (car (last path-elements))))
-
     (unless (file-exists-p dest-folder)
       (make-directory dest-folder t))
-
     (find-file
      (concat (file-name-as-directory dest-folder)
              (format "%s.java" simple-class-name)))
     (save-buffer)
-
     (when new-paths
       (insert "package " (mapconcat #'identity new-paths ".") ";\n\n"))
-
     (insert (format (gethash class-type class-by-type)
                     simple-class-name))
-
     (save-buffer)))
 
 (defun eglot-java--do-find-nearest-class-at-point (acc syms idx elt-type cursor-location)
@@ -542,10 +550,10 @@ CURSOR-LOCATION represents a property list with the line information."
 
 (defun eglot-java--find-nearest-method-at-point ()
   "Find the nearest method at the current cursor location."
-  (let* ((syms          (eglot-java--document-symbols))
-         (line-current  (- (line-number-at-pos) 1))
-         (package-name  (eglot-java--symbol-value syms "Package"))
-         (class-name    (eglot-java--do-find-nearest-class-at-point nil syms 0 "Class" (list :line line-current))))
+  (let* ((syms         (eglot-java--document-symbols))
+         (line-current (- (line-number-at-pos) 1))
+         (package-name (eglot-java--symbol-value syms "Package"))
+         (class-name   (eglot-java--do-find-nearest-class-at-point nil syms 0 "Class" (list :line line-current))))
     (when class-name
       (let ((method-name (eglot-java--do-find-nearest-method-at-point syms 0 "Method" (list :line line-current))))
         (when method-name
@@ -559,11 +567,8 @@ CURSOR-LOCATION represents a property list with the line information."
 
 (defun eglot-java--record-version-info (ver-number dest-file)
   "Store a version VER-NUMBER to a file DEST-FILE."
-  (let ((b (find-file dest-file)))
-    (switch-to-buffer b)
-    (insert (format "%s\n" ver-number))
-    (save-buffer)
-    (kill-buffer b)))
+  (with-temp-file dest-file
+    (insert (format "%s\n" ver-number))))
 
 ;; Implementation copied from https://stackoverflow.com/questions/13337969/how-do-i-parse-xml-from-a-url-in-emacs
 (defun eglot-java--parse-xml-buffer (&optional buffer)
@@ -745,19 +750,18 @@ METADATA-XML-URL is the Maven URL containing a maven-metadata.xml file for the a
     (unless (file-exists-p selected-project-dir)
       (make-directory selected-project-dir t))
 
-    (let ((b
-           (eglot-java--build-run
-            selected-project-dir
-            (eglot-java--build-executable "gradle" "gradlew" selected-project-dir)
-            (mapconcat #'identity
-                       (list "init"
-                             "--type"
-                             selected-project-type
-                             "--test-framework"
-                             selected-test-framework
-                             "--dsl"
-                             selected-dsl)
-                       " "))))
+    (let ((b (eglot-java--build-run
+              selected-project-dir
+              (eglot-java--build-executable "gradle" "gradlew" selected-project-dir)
+              (mapconcat #'identity
+                         (list "init"
+                               "--type"
+                               selected-project-type
+                               "--test-framework"
+                               selected-test-framework
+                               "--dsl"
+                               selected-dsl)
+                         " "))))
       (with-current-buffer b
         (setq eglot-java-project-new-directory selected-project-dir))
 
@@ -858,19 +862,19 @@ METADATA-XML-URL is the Maven URL containing a maven-metadata.xml file for the a
   (interactive)
   (let* ((root       (cdr (project-current)))
          (build-file (if (eglot-java--project-gradle-p root)
-                         (expand-file-name eglot-java-filename-build-gradle (file-name-as-directory root))
+                         (if (file-exists-p (expand-file-name eglot-java-filename-build-gradle-kotlin root))
+                             (expand-file-name eglot-java-filename-build-gradle-kotlin (file-name-as-directory root))
+                           (expand-file-name eglot-java-filename-build-gradle-groovy (file-name-as-directory root)))
                        (expand-file-name eglot-java-filename-build-maven (file-name-as-directory root)))))
-    
-    (progn
-      (when (file-exists-p build-file)
-        (jsonrpc-notify
-         (eglot--current-server-or-lose)
-         :java/projectConfigurationUpdate
-         (list :uri (eglot--path-to-uri build-file))))
+    (when (file-exists-p build-file)
       (jsonrpc-notify
        (eglot--current-server-or-lose)
-       :java/buildWorkspace
-       '((:json-false))))))
+       :java/projectConfigurationUpdate
+       (list :uri (eglot--path-to-uri build-file))))
+    (jsonrpc-notify
+     (eglot--current-server-or-lose)
+     :java/buildWorkspace
+     (vector :json-false))))
 
 (defun eglot-java-project-build-task ()
   "Run a new build task."
@@ -879,7 +883,9 @@ METADATA-XML-URL is the Maven URL containing a maven-metadata.xml file for the a
          (goal                      (read-string "Task & Parameters: " "test"))
          (project-is-gradle-project (eglot-java--project-gradle-p project-dir))
          (build-filename            (if project-is-gradle-project
-                                        eglot-java-filename-build-gradle
+                                        (if (file-exists-p (expand-file-name eglot-java-filename-build-gradle-kotlin project-dir))
+                                            eglot-java-filename-build-gradle-kotlin
+                                          eglot-java-filename-build-gradle-groovy)
                                       eglot-java-filename-build-maven))
          (build-filename-flag       (if project-is-gradle-project
                                         "-b"
@@ -887,13 +893,12 @@ METADATA-XML-URL is the Maven URL containing a maven-metadata.xml file for the a
          (build-cmd                 (if project-is-gradle-project
                                         (eglot-java--build-executable "gradle" "gradlew" project-dir)
                                       (eglot-java--build-executable "mvn" "mvnw" project-dir))))
-    (async-shell-command (format
-                          "%s %s %s %s"
-                          build-cmd
-                          build-filename-flag
-                          (shell-quote-argument
-                           (expand-file-name build-filename project-dir))
-                          goal))))
+    (async-shell-command (format "%s %s %s %s"
+                                 build-cmd
+                                 build-filename-flag
+                                 (shell-quote-argument
+                                  (expand-file-name build-filename project-dir))
+                                 goal))))
 
 (defun eglot-java--read-json-from-url (url)
   "Fetch the LSP server download metadata in JSON format.
@@ -921,7 +926,7 @@ METADATA is the JSON API response contents."
 (defun eglot-java--upgrade-junit-jar (junit-jar-path)
   "Upgrade the JUnit JAR installation for a given path at JUNIT-JAR-PATH."
   (let* ((time-cur        (current-time))
-         (tmp-folder-name (format "junit-standalone-console-%d-%d" (car time-cur) (car (cdr time-cur))))
+         (tmp-folder-name (format "junit-standalone-console-%d-%d" (car time-cur) (cadr time-cur)))
          (install-dir     (expand-file-name (file-name-directory junit-jar-path)))
          (install-dir-tmp (expand-file-name tmp-folder-name (temporary-file-directory)))
          (install-jar-tmp (expand-file-name (file-name-nondirectory junit-jar-path) install-dir-tmp)))
@@ -934,13 +939,12 @@ METADATA is the JSON API response contents."
                                  t)
                              (error nil))))
       (if install-success
-          (progn
-            ;; upon success full installation rename the temporary installation folder
-            (let ((install-dir-tmp-tmp (format "%s-tmp" install-dir-tmp)))
-              (rename-file (directory-file-name install-dir) (directory-file-name install-dir-tmp-tmp))
-              (rename-file (directory-file-name install-dir-tmp) (directory-file-name install-dir))
-              (delete-directory install-dir-tmp-tmp t)
-              (message "The JUnit jar was successfully upgraded.")))
+          ;; upon success full installation rename the temporary installation folder
+          (let ((install-dir-tmp-tmp (format "%s-tmp" install-dir-tmp)))
+            (rename-file (directory-file-name install-dir) (directory-file-name install-dir-tmp-tmp))
+            (rename-file (directory-file-name install-dir-tmp) (directory-file-name install-dir))
+            (delete-directory install-dir-tmp-tmp t)
+            (message "The JUnit jar was successfully upgraded."))
         (ignore-errors
           (progn
             (message "The JUnit jar upgrade failed!")
@@ -956,7 +960,7 @@ INSTALL-DIR is the directory where the LSP server will be upgraded."
                                           buf))
                                    collect buf))
          (time-cur        (current-time))
-         (tmp-folder-name (format "jdtls-%d-%d" (car time-cur) (car (cdr time-cur))))
+         (tmp-folder-name (format "jdtls-%d-%d" (car time-cur) (cadr time-cur)))
          (install-dir-tmp (expand-file-name tmp-folder-name (temporary-file-directory))))
     ;; create temporary directory
     (mkdir install-dir-tmp t)
@@ -971,18 +975,17 @@ INSTALL-DIR is the directory where the LSP server will be upgraded."
                                  (eglot-java--install-lsp-server install-dir-tmp)
                                  t)
                              (error nil))))
-      (if install-success
-          (progn
-            ;; upon success full installation rename the temporary installation folder
-            (let ((install-dir-tmp-tmp (format "%s-tmp" install-dir-tmp)))
-              (rename-file (directory-file-name install-dir) (directory-file-name install-dir-tmp-tmp))
-              (rename-file (directory-file-name install-dir-tmp)  (directory-file-name install-dir))
-              (delete-directory install-dir-tmp-tmp t)
-              (message "The JDT LSP server was successfully upgraded.")
-              ;; re-associate the jdtls server to known managed buffers
-              (dolist (buf buffers-managed)
-                (with-current-buffer buf
-                  (eglot-java-mode 1)))))
+      (if install-success          
+          ;; upon success full installation rename the temporary installation folder
+          (let ((install-dir-tmp-tmp (format "%s-tmp" install-dir-tmp)))
+            (rename-file (directory-file-name install-dir) (directory-file-name install-dir-tmp-tmp))
+            (rename-file (directory-file-name install-dir-tmp)  (directory-file-name install-dir))
+            (delete-directory install-dir-tmp-tmp t)
+            (message "The JDT LSP server was successfully upgraded.")
+            ;; re-associate the jdtls server to known managed buffers
+            (dolist (buf buffers-managed)
+              (with-current-buffer buf
+                (eglot-java-mode 1))))
         (ignore-errors
           (progn
             (message "The LSP server upgrade failed!")
@@ -1038,14 +1041,13 @@ DESTINATION-DIR is the directory where the LSP server will be installed."
                                                         (cons (car item) nil))))
                                                   eglot-server-programs)))
         (if existing-java-related-assocs
-            (progn
-              (let ((eff-existing-java-related-assocs (if (= 1 (length existing-java-related-assocs))
-                                                          (if (assq existing-java-related-assocs eglot-server-programs)
-                                                              existing-java-related-assocs
-                                                            (car existing-java-related-assocs))
-                                                        existing-java-related-assocs)))
-                (unless (eq 'eglot-java--eclipse-contact (assq eff-existing-java-related-assocs eglot-server-programs))
-                  (setcdr (assoc eff-existing-java-related-assocs eglot-server-programs) 'eglot-java--eclipse-contact))))
+            (let ((eff-existing-java-related-assocs (if (= 1 (length existing-java-related-assocs))
+                                                        (if (assq existing-java-related-assocs eglot-server-programs)
+                                                            existing-java-related-assocs
+                                                          (car existing-java-related-assocs))
+                                                      existing-java-related-assocs)))
+              (unless (eq 'eglot-java--eclipse-contact (assq eff-existing-java-related-assocs eglot-server-programs))
+                (setcdr (assoc eff-existing-java-related-assocs eglot-server-programs) 'eglot-java--eclipse-contact)))
           (add-to-list eglot-server-programs 'java-mode 'eglot-java--eclipse-contact))))
     (unless (member 'eglot-java--project-try project-find-functions)
       (add-hook 'project-find-functions #'eglot-java--project-try))))
@@ -1115,51 +1117,43 @@ handle it. If it is not a jar call ORIGINAL-FN."
   (interactive)
   (let ((junit-jar-path (expand-file-name eglot-java-junit-platform-console-standalone-jar)))
     (if (file-exists-p junit-jar-path)
-        (progn
-          (let* ((version-file-dir (file-name-directory junit-jar-path))
-                 (version-file     (expand-file-name eglot-java-filename-version-junit version-file-dir)))
-            (if (file-exists-p version-file)
-                (progn
-                  (let* ((version-installed (eglot-java--file-read-trim version-file))
-                         (download-metadata (eglot-java--find-latest-junit-metadata eglot-java-maven-repo-root-url))
-                         (version-latest    (plist-get download-metadata :download-version)))
-                    (if (eglot-java--version< version-installed version-latest)
-                        (progn
-                          (message "Upgrading the JUnit jar from version %s to %s." version-installed version-latest)
-                          (eglot-java--upgrade-junit-jar junit-jar-path))
-                      (message "You're already running the latest JUnit jar version (%s)!" version-installed))))
-              (progn
-                (when (yes-or-no-p "No previous JUnit jar version recorded! Do you want install the latest version?")
-                  (eglot-java--upgrade-junit-jar junit-jar-path))))))
-      (progn
-        (when (yes-or-no-p "No previous JUnit jar installation found! Do you want install the latest version?")
-          (eglot-java--install-junit-jar junit-jar-path))))))
+        (let* ((version-file-dir (file-name-directory junit-jar-path))
+               (version-file     (expand-file-name eglot-java-filename-version-junit version-file-dir)))
+          (if (file-exists-p version-file)
+              (let* ((version-installed (eglot-java--file-read-trim version-file))
+                     (download-metadata (eglot-java--find-latest-junit-metadata eglot-java-maven-repo-root-url))
+                     (version-latest    (plist-get download-metadata :download-version)))
+                (if (eglot-java--version< version-installed version-latest)
+                    (progn
+                      (message "Upgrading the JUnit jar from version %s to %s." version-installed version-latest)
+                      (eglot-java--upgrade-junit-jar junit-jar-path))
+                  (message "You're already running the latest JUnit jar version (%s)!" version-installed)))
+            (when (yes-or-no-p "No previous JUnit jar version recorded! Do you want install the latest version?")
+              (eglot-java--upgrade-junit-jar junit-jar-path))))      
+      (when (yes-or-no-p "No previous JUnit jar installation found! Do you want install the latest version?")
+        (eglot-java--install-junit-jar junit-jar-path)))))
 
 ;;;###autoload
 (defun eglot-java-upgrade-lsp-server ()
   "Upgrade the LSP server installation."
   (interactive)
   (let ((install-dir (expand-file-name eglot-java-server-install-dir)))
-    (if (file-exists-p install-dir)
-        (progn
-          (let ((lsp-server-versionfile (expand-file-name eglot-java-filename-version-jdtls install-dir)))
-            (if (file-exists-p lsp-server-versionfile)
-                (progn
-                  (let* ((version-installed (eglot-java--file-read-trim lsp-server-versionfile))
-                         (download-metadata (eglot-java--parse-jdtls-download-metadata
-                                             (eglot-java--read-json-from-url eglot-java-eclipse-jdt-ls-dl-metadata-url)))
-                         (version-latest    (plist-get download-metadata :download-version)))
-                    (if (eglot-java--version< version-installed version-latest)
-                        (progn
-                          (message "Upgrading the JDT LSP server from version %s to %s." version-installed version-latest)
-                          (eglot-java--upgrade-lsp-server install-dir))
-                      (message "You're already running the latest JDT LSP server version (%s)!" version-installed))))
-              (progn
-                (when (yes-or-no-p "No previous LSP server version recorded! Do you want install the latest stable version?")
-                  (eglot-java--upgrade-lsp-server install-dir))))))
-      (progn
-        (when (yes-or-no-p "No previous LSP server installation found! Do you want install the latest stable version?")
-          (eglot-java--install-lsp-server install-dir))))))
+    (if (file-exists-p install-dir)        
+        (let ((lsp-server-versionfile (expand-file-name eglot-java-filename-version-jdtls install-dir)))
+          (if (file-exists-p lsp-server-versionfile)
+              (let* ((version-installed (eglot-java--file-read-trim lsp-server-versionfile))
+                     (download-metadata (eglot-java--parse-jdtls-download-metadata
+                                         (eglot-java--read-json-from-url eglot-java-eclipse-jdt-ls-dl-metadata-url)))
+                     (version-latest    (plist-get download-metadata :download-version)))
+                (if (eglot-java--version< version-installed version-latest)
+                    (progn
+                      (message "Upgrading the JDT LSP server from version %s to %s." version-installed version-latest)
+                      (eglot-java--upgrade-lsp-server install-dir))
+                  (message "You're already running the latest JDT LSP server version (%s)!" version-installed)))            
+            (when (yes-or-no-p "No previous LSP server version recorded! Do you want install the latest stable version?")
+              (eglot-java--upgrade-lsp-server install-dir))))
+      (when (yes-or-no-p "No previous LSP server installation found! Do you want install the latest stable version?")
+        (eglot-java--install-lsp-server install-dir)))))
 
 ;;;###autoload
 (define-minor-mode eglot-java-mode
@@ -1176,4 +1170,3 @@ handle it. If it is not a jar call ORIGINAL-FN."
         (call-interactively 'eglot-shutdown)))))
 
 (provide 'eglot-java)
-;;; eglot-java.el ends here
