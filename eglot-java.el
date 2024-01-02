@@ -1170,3 +1170,4 @@ handle it. If it is not a jar call ORIGINAL-FN."
         (call-interactively 'eglot-shutdown)))))
 
 (provide 'eglot-java)
+;;; eglot-java.el ends here
