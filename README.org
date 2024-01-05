@@ -45,6 +45,7 @@ Once the MELPA repository is configured, please run =M-x package-install= and ty
 You can configure few settings to reflect your preferences via =M-x customize-group= (/eglot-java/):
 - You can set the default LSP server installation folder, etc.
 - You can specify JVM arguments for the LSP server (=eglot-java-eclipse-jdt-args= variable).
+- You can control eglot initialization of LSP server settings through the =eglot-java-user-init-options= variable. Its value will be merged with defaults (e.g., specifying code formatting profiles, etc.).
 - etc.
 
 ** Configuration
@@ -94,6 +95,43 @@ The =classFileContentsSupport= capability is registered with some known limitati
 In early versions of =eglot-java=, the LSP server installation was reflecting the latest available snapshot.
 
 As of =eglot-java 1.11= (December 2023), only milestones releases will be installed in order to mitigate challenges with buggy snapshot versions (See issues [[https://github.com/yveszoundi/eglot-java/issues/15][#15]] and [[https://github.com/yveszoundi/eglot-java/issues/16][#16]] for reference).
+
+** LSP server initialization options
+
+Sometimes you may want to add/modify [[https://github.com/eclipse-jdtls/eclipse.jdt.ls/wiki/Running-the-JAVA-LS-server-from-the-command-line#initialize-request][LSP server initialization settings]].
+
+- For basic flexibility, you can control the =settings= node of the LSP server configuration via the variable [[https://www.gnu.org/software/emacs/manual/html_node/eglot/User_002dspecific-configuration.html][eglot-workspace-configuration]].
+- For greater flexibility, you can leverage the =eglot-java-user-init-opts-fn= variable.
+  - You'll need to bind the value of =eglot-java-user-init-opts-fn= with your own callback function.
+  - You'll need to return a [[https://www.gnu.org/software/emacs/manual/html_node/elisp/Property-Lists.html][property list]] of valid JDT LS settings (merged with defaults)
+    - In =eglot= keys (property names) are keywords symbols (e.g., =:key=)
+    - Instead of curly braces in JSON, you use parenthesis (e.g., =(:java (:home "/usr/share/jdk21"))=)
+    - For boolean values, use =t= for "true" and =:json-false= for "false"
+
+#+begin_src emacs-lisp
+  (setq eglot-java-user-init-opts-fn 'custom-eglot-java-init-opts)
+  (defun custom-eglot-java-init-opts (server eglot-java-eclipse-jdt)
+    "Custom options that will be merged with any default settings."
+    '(:settings
+      (:java
+       (:format
+        (:settings
+         (:url "https://raw.githubusercontent.com/google/styleguide/gh-pages/eclipse-java-google-style.xml")
+         :enabled t)))))
+#+end_src
+
+The list of LSP server settings is available in the [[https://github.com/eclipse-jdtls/eclipse.jdt.ls/wiki][Eclipse JDT LS wiki]] on GitHub:
+- [[https://github.com/eclipse-jdtls/eclipse.jdt.ls/wiki/Language-Server-Settings-&-Capabilities][General summary and list of extended capabilities]]
+- [[https://github.com/eclipse-jdtls/eclipse.jdt.ls/wiki/Running-the-JAVA-LS-server-from-the-command-line#initialize-request][Available settings (names and data types)]]
+
+Per general Eclipse JDT LS documentation, a basic skeleton of an initialization customization could look as follow:
+
+#+begin_src emacs-lisp
+  '(:bundles: ["/home/me/lsp-server/bundles/my-lsp-extension.jar"]
+    :workspaceFolders: ["file:///home/me/Projects/mavenproject"]
+    :settings: (:java (:home "/usr/local/jdk21"))
+    :extendedClientCapabilities (:classFileContentsSupport t))
+#+end_src
 
 * Contributing
 

@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2019-2024 Yves Zoundi
 
-;; Version: 1.22
+;; Version: 1.23
 ;; Author: Yves Zoundi <yves_zoundi@hotmail.com>
 ;; Maintainer: Yves Zoundi <yves_zoundi@hotmail.com>
 ;; URL: https://github.com/yveszoundi/eglot-java
@@ -57,6 +57,23 @@
 ;;   (define-key eglot-java-mode-map (kbd "C-c l N") #'eglot-java-project-new)
 ;;   (define-key eglot-java-mode-map (kbd "C-c l T") #'eglot-java-project-build-task)
 ;;   (define-key eglot-java-mode-map (kbd "C-c l R") #'eglot-java-project-build-refresh))
+;;
+;; Sometimes you may want to add/modify LSP server initialization settings.
+;; JDT LS settings documentation: https://github.com/eclipse-jdtls/eclipse.jdt.ls/wiki/Running-the-JAVA-LS-server-from-the-command-line#initialize-request
+;; - For basic flexibility, you can control the ":settings" node of the LSP server configuration via the variable "eglot-workspace-configuration".
+;; - For greater flexibility, you can leverage the "eglot-java-user-init-opts-fn" variable.
+;;   - You'll need to bind the value of the "eglot-java-user-init-opts-fn" with your own callback function.
+;;   - You'll need to return a property list of valid JDT LS settings (merged with defaults)
+;;
+;; (setq eglot-java-user-init-opts-fn 'custom-eglot-java-init-opts)
+;; (defun custom-eglot-java-init-opts (server eglot-java-eclipse-jdt)
+;;   "Custom options that will be merged with any default settings."
+;;   '(:settings
+;;     (:java
+;;      (:format
+;;       (:settings
+;;        (:url "https://raw.githubusercontent.com/google/styleguide/gh-pages/eclipse-java-google-style.xml")
+;;        :enabled t)))))
 ;;
 ;; The behavior of the "eglot-java-run-test" function depends on the cursor location:
 ;; - If there's an enclosing method at the current cursor location, that specific test method will run
@@ -172,6 +189,12 @@
   :type 'string
   :group 'eglot-java)
 
+(defcustom eglot-java-user-init-opts-fn
+  nil
+  "User-defined function returning a property list of LSP server initialization options. The callback accepts 2 parameters (server eglot-java-eclipse-jdt)."
+  :type 'symbol
+  :group 'eglot-java)
+
 (defconst eglot-java-filename-build-maven          "pom.xml"                   "Maven build file name.")
 (defconst eglot-java-filename-build-gradle-groovy  "build.gradle"              "Gradle build file name with Groovy.")
 (defconst eglot-java-filename-build-gradle-kotlin  "build.gradle.kts"          "Gradle build file name with Kotlin.")
@@ -230,37 +253,60 @@ This allows additional suffixes in versions for milestones or snapshots. e.g., 1
           (when (not (string= "" last-v1))
             (string< last-v1 last-v2)))))))
 
+;; Copied from https://emacs.stackexchange.com/questions/5436/function-to-merge-two-property-lists
+(defun eglot-java--plist-merge (&rest plists)
+  "Create a single property list from all plists in PLISTS.
+The process starts by copying the first list, and then setting properties
+from the other lists.  Settings in the last list are the most significant
+ones and overrule settings in the other lists."
+  (let ((rtn (copy-sequence (pop plists)))
+        p v ls)
+    (while plists
+      (setq ls (pop plists))
+      (while ls
+        (setq p (pop ls) v (pop ls))
+        (setq rtn (plist-put rtn p v))))
+    rtn))
+
 (cl-defmethod eglot-initialization-options ((server eglot-java-eclipse-jdt))
   "Passes through required jdt initialization options."
-  ;; TODO Allow hooks for settings such as extendedClientCapabilities  
-  `(:extendedClientCapabilities (:classFileContentsSupport t)
-                                :workspaceFolders
-                                [,@(cl-delete-duplicates
-                                    (mapcar #'eglot--path-to-uri
-                                            (let* ((root (project-root (eglot--project server))))
-                                              (cons root
-                                                    (mapcar
-                                                     #'file-name-directory
-                                                     (append
-                                                      (file-expand-wildcards (concat root "/*" eglot-java-filename-build-maven))
-                                                      (file-expand-wildcards (concat root "/*" eglot-java-filename-build-gradle-groovy))
-                                                      (file-expand-wildcards (concat root "/*" eglot-java-filename-build-gradle-kotlin))
-                                                      (file-expand-wildcards (concat root "/.project")))))))
-                                    :test #'string=)]
-
-                                ,@(if-let ((home (or eglot-java-java-home
-                                                     (getenv "JAVA_HOME")
-                                                     (ignore-errors
-                                                       (expand-file-name
-                                                        ".."
-                                                        (file-name-directory
-                                                         (file-chase-links (executable-find "javac"))))))))
-                                      `(:settings (:java (:home ,home)
-                                                         :import (:gradle (:enabled t)
-                                                                          ,@(when eglot-java-gradle-version
-                                                                              (:version eglot-java-gradle-version))
-                                                                          :wrapper (:enabled ,(or eglot-java-gradle-wrapper-enable :json-false)))))
-                                    (ignore (eglot--warn "JAVA_HOME environment is not set")))))
+  ;; TODO Allow hooks for settings such as extendedClientCapabilities
+  (let ((settings-plist `(:extendedClientCapabilities
+                          (:classFileContentsSupport t)
+                          :workspaceFolders
+                          [,@(cl-delete-duplicates
+                              (mapcar #'eglot--path-to-uri
+                                      (let* ((root (project-root (eglot--project server))))
+                                        (cons root
+                                              (mapcar
+                                               #'file-name-directory
+                                               (append
+                                                (file-expand-wildcards (concat root "/*" eglot-java-filename-build-maven))
+                                                (file-expand-wildcards (concat root "/*" eglot-java-filename-build-gradle-groovy))
+                                                (file-expand-wildcards (concat root "/*" eglot-java-filename-build-gradle-kotlin))
+                                                (file-expand-wildcards (concat root "/.project")))))))
+                              :test #'string=)]
+                          ,@(if-let ((home (or eglot-java-java-home
+                                               (getenv "JAVA_HOME")
+                                               (ignore-errors
+                                                 (expand-file-name
+                                                  ".."
+                                                  (file-name-directory
+                                                   (file-chase-links (executable-find "javac"))))))))
+                                `(:settings (:java
+                                             (:home ,home)
+                                             :import
+                                             (:gradle (:enabled t)
+                                                      ,@(when eglot-java-gradle-version
+                                                          (:version eglot-java-gradle-version))
+                                                      :wrapper (:enabled ,(or eglot-java-gradle-wrapper-enable :json-false)))))
+                              (ignore (eglot--warn "JAVA_HOME environment is not set"))))))
+    (if eglot-java-user-init-opts-fn
+        (if (fboundp eglot-java-user-init-opts-fn)
+            (let ((user-opts (funcall eglot-java-user-init-opts-fn server eglot-java-eclipse-jdt)))
+              (eglot-java--plist-merge settings-plist user-opts))
+          (warn (format "Cannot find function: %s!" eglot-java-user-init-opts-fn)))
+      settings-plist)))
 
 (defun eglot-java--eclipse-jdt-contact (interactive)
   "Return a contact for connecting to eclipse.jdt.ls server, as a cons cell.
@@ -975,7 +1021,7 @@ INSTALL-DIR is the directory where the LSP server will be upgraded."
                                  (eglot-java--install-lsp-server install-dir-tmp)
                                  t)
                              (error nil))))
-      (if install-success          
+      (if install-success
           ;; upon success full installation rename the temporary installation folder
           (let ((install-dir-tmp-tmp (format "%s-tmp" install-dir-tmp)))
             (rename-file (directory-file-name install-dir) (directory-file-name install-dir-tmp-tmp))
@@ -1129,7 +1175,7 @@ handle it. If it is not a jar call ORIGINAL-FN."
                       (eglot-java--upgrade-junit-jar junit-jar-path))
                   (message "You're already running the latest JUnit jar version (%s)!" version-installed)))
             (when (yes-or-no-p "No previous JUnit jar version recorded! Do you want install the latest version?")
-              (eglot-java--upgrade-junit-jar junit-jar-path))))      
+              (eglot-java--upgrade-junit-jar junit-jar-path))))
       (when (yes-or-no-p "No previous JUnit jar installation found! Do you want install the latest version?")
         (eglot-java--install-junit-jar junit-jar-path)))))
 
@@ -1138,7 +1184,7 @@ handle it. If it is not a jar call ORIGINAL-FN."
   "Upgrade the LSP server installation."
   (interactive)
   (let ((install-dir (expand-file-name eglot-java-server-install-dir)))
-    (if (file-exists-p install-dir)        
+    (if (file-exists-p install-dir)
         (let ((lsp-server-versionfile (expand-file-name eglot-java-filename-version-jdtls install-dir)))
           (if (file-exists-p lsp-server-versionfile)
               (let* ((version-installed (eglot-java--file-read-trim lsp-server-versionfile))
@@ -1149,7 +1195,7 @@ handle it. If it is not a jar call ORIGINAL-FN."
                     (progn
                       (message "Upgrading the JDT LSP server from version %s to %s." version-installed version-latest)
                       (eglot-java--upgrade-lsp-server install-dir))
-                  (message "You're already running the latest JDT LSP server version (%s)!" version-installed)))            
+                  (message "You're already running the latest JDT LSP server version (%s)!" version-installed)))
             (when (yes-or-no-p "No previous LSP server version recorded! Do you want install the latest stable version?")
               (eglot-java--upgrade-lsp-server install-dir))))
       (when (yes-or-no-p "No previous LSP server installation found! Do you want install the latest stable version?")
