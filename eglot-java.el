@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2019-2024 Yves Zoundi
 
-;; Version: 1.23
+;; Version: 1.24
 ;; Author: Yves Zoundi <yves_zoundi@hotmail.com>
 ;; Maintainer: Yves Zoundi <yves_zoundi@hotmail.com>
 ;; URL: https://github.com/yveszoundi/eglot-java
@@ -305,7 +305,7 @@ ones and overrule settings in the other lists."
         (if (fboundp eglot-java-user-init-opts-fn)
             (let ((user-opts (funcall eglot-java-user-init-opts-fn server eglot-java-eclipse-jdt)))
               (eglot-java--plist-merge settings-plist user-opts))
-          (warn (format "Cannot find function: %s!" eglot-java-user-init-opts-fn)))
+          (warn (format "The LSP settings initialization function is not bound! %s!" eglot-java-user-init-opts-fn)))
       settings-plist)))
 
 (defun eglot-java--eclipse-jdt-contact (interactive)
@@ -419,8 +419,7 @@ Otherwise returns nil"
                                                             t))))
     (when (not equinox-launcher-jar)
       (user-error "Could not find Eclipse OSGI jar launcher!"))
-    (expand-file-name equinox-launcher-jar
-                      lsp-java-server-plugins-dir)))
+    (expand-file-name equinox-launcher-jar lsp-java-server-plugins-dir)))
 
 (defun eglot-java--eclipse-contact (_interactive)
   "Setup the classpath in an INTERACTIVE fashion."
@@ -498,7 +497,7 @@ Otherwise the basename of the folder ROOT will be returned."
   (plist-get (eglot-execute-command (eglot--current-server-or-lose)
                                     "java.project.getClasspaths"
                                     (vector (eglot--path-to-uri filename)
-                                            (json-encode `(( "scope" . ,scope)))))
+                                            (json-encode `(("scope" . ,scope)))))
              :classpaths))
 
 (defun eglot-java-file-new ()
@@ -598,7 +597,7 @@ CURSOR-LOCATION represents a property list with the line information."
   "Find the nearest method at the current cursor location."
   (let* ((syms         (eglot-java--document-symbols))
          (line-current (- (line-number-at-pos) 1))
-         (package-name (eglot-java--symbol-value syms "Package"))
+         (package-name (eglot-java--symbol-name-for-type syms "Package"))
          (class-name   (eglot-java--do-find-nearest-class-at-point nil syms 0 "Class" (list :line line-current))))
     (when class-name
       (let ((method-name (eglot-java--do-find-nearest-method-at-point syms 0 "Method" (list :line line-current))))
@@ -644,14 +643,16 @@ METADATA-XML-URL is the Maven URL containing a maven-metadata.xml file for the a
 (defun eglot-java--find-latest-junit-metadata (maven-repo-root-url)
   "Returns the latest JUnit jar URL given a Maven repository root URL.
   MAVEN-REPO-ROOT-URL The Maven repository URL such as https://repo1.maven.org/maven2."
-  (let* ((maven-root-url (if (string-match-p "/\\'" maven-repo-root-url)
-                             (format "%sorg/junit/platform/junit-platform-console-standalone" maven-repo-root-url)
-                           (format "%s/org/junit/platform/junit-platform-console-standalone" maven-repo-root-url)))
+  (let* ((artifact-id    "junit-platform-console-standalone")
+         (maven-root-url (if (string-match-p "/\\'" maven-repo-root-url)
+                             (format "%sorg/junit/platform/%s" maven-repo-root-url artifact-id)
+                           (format "%s/org/junit/platform/%s" maven-repo-root-url artifact-id)))
          (junit-version (eglot-java--fetch-junit-latest-version (format "%s/%s" maven-root-url "maven-metadata.xml"))))
     (list :download-version junit-version
-          :download-url     (format "%s/%s/junit-platform-console-standalone-%s.jar"
+          :download-url     (format "%s/%s/%s-%s.jar"
                                     maven-root-url
                                     junit-version
+                                    artifact-id
                                     junit-version))))
 
 (defun eglot-java--install-junit-jar (junit-jar-path)
@@ -705,14 +706,14 @@ METADATA-XML-URL is the Maven URL containing a maven-metadata.xml file for the a
 (defun eglot-java--class-fqcn ()
   "Return the fully qualified name of a given class."
   (let* ((document-symbols (eglot-java--document-symbols))
-         (package-name     (eglot-java--symbol-value document-symbols "Package"))
-         (class-name       (eglot-java--symbol-value document-symbols "Class"))
+         (package-name     (eglot-java--symbol-name-for-type document-symbols "Package"))
+         (class-name       (eglot-java--symbol-name-for-type document-symbols "Class"))
          (package-suffix   (if (string= "" package-name)
                                package-name
                              ".")))
-    (format "%s%s%s" package-name package-suffix class-name)))
+    (concat package-name package-suffix class-name)))
 
-(defun eglot-java--symbol-value (symbols symbol-type)
+(defun eglot-java--symbol-name-for-type (symbols symbol-type)
   "Extract the symbol value for a given SYMBOL-TYPE from a symbol table SYMBOLS."
   (let ((symbol-details (cl-find-if
                          (lambda (elem)
@@ -740,7 +741,8 @@ METADATA-XML-URL is the Maven URL containing a maven-metadata.xml file for the a
                                                         "="
                                                         (url-hexify-string (cdr arg))))
                                               (list)
-                                              "&")))
+                                              "&")))    
+    (message "Downloading spring initializr JSON data...")
     (eglot-java--read-json-from-url url)))
 
 (defun eglot-java-project-new ()
@@ -816,7 +818,6 @@ METADATA-XML-URL is the Maven URL containing a maven-metadata.xml file for the a
 (defun eglot-java--project-new-spring ()
   "Create a new Spring java project using spring initializr. User input parameters are extracted from the JSON structure."
   (unless eglot-java-spring-starter-jsontext
-    (message "Downloading spring initializr JSON data...")
     (setq eglot-java-spring-starter-jsontext
           (eglot-java--get-spring-initializr-json eglot-java-spring-starter-url-projectdef)))
 
@@ -978,7 +979,7 @@ METADATA is the JSON API response contents."
          (install-jar-tmp (expand-file-name (file-name-nondirectory junit-jar-path) install-dir-tmp)))
     ;; create temporary directory
     (mkdir install-dir-tmp t)
-    ;; install the new version of the LSP server
+    ;; install the new version of the junit jar
     (let ((install-success (condition-case nil
                                (progn
                                  (eglot-java--install-junit-jar install-jar-tmp)

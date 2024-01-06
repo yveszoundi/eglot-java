@@ -103,10 +103,12 @@ Sometimes you may want to add/modify [[https://github.com/eclipse-jdtls/eclipse.
 - For basic flexibility, you can control the =settings= node of the LSP server configuration via the variable [[https://www.gnu.org/software/emacs/manual/html_node/eglot/User_002dspecific-configuration.html][eglot-workspace-configuration]].
 - For greater flexibility, you can leverage the =eglot-java-user-init-opts-fn= variable.
   - You'll need to bind the value of =eglot-java-user-init-opts-fn= with your own callback function.
-  - You'll need to return a [[https://www.gnu.org/software/emacs/manual/html_node/elisp/Property-Lists.html][property list]] of valid JDT LS settings (merged with defaults)
+  - You'll need to return a [[https://www.gnu.org/software/emacs/manual/html_node/elisp/Property-Lists.html][property list]] of valid JDT LS settings (merged with defaults):
     - In =eglot= keys (property names) are keywords symbols (e.g., =:key=)
-    - Instead of curly braces in JSON, you use parenthesis (e.g., =(:java (:home "/usr/share/jdk21"))=)
+    - Instead of curly braces in JSON, you use nested parenthesis (e.g., =(:java (:home "/usr/share/jdk21"))=)
     - For boolean values, use =t= for "true" and =:json-false= for "false"
+
+In the example below, the Google style of formatting is configured for later invocation via =M-x eglot-format=.
 
 #+begin_src emacs-lisp
   (setq eglot-java-user-init-opts-fn 'custom-eglot-java-init-opts)
