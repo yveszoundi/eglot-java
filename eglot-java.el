@@ -677,13 +677,13 @@ METADATA-XML-URL is the Maven URL containing a maven-metadata.xml file for the a
         (compile
          (concat (eglot-java--find-java-program-from-alternatives)
                  " -jar "
-                 eglot-java-junit-platform-console-standalone-jar
+                 "\"" (expand-file-name eglot-java-junit-platform-console-standalone-jar) "\""
                  (if (string-match-p "#" fqcn)
                      " -m "
                    " -c ")
                  fqcn
                  " -class-path "
-                 (mapconcat #'identity cp path-separator)
+                 "\"" (mapconcat #'identity cp path-separator) "\""
                  " ")
          t)
       (user-error "No test found in current file! Is the file saved?"))))
@@ -697,7 +697,7 @@ METADATA-XML-URL is the Maven URL containing a maven-metadata.xml file for the a
         (compile
          (concat (eglot-java--find-java-program-from-alternatives)
                  " -cp "
-                 (mapconcat #'identity cp path-separator)
+                 "\"" (mapconcat #'identity cp path-separator) "\""
                  " "
                  fqcn)
          t)
