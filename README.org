@@ -69,9 +69,10 @@ Below is a sample minimal configuration, without any fancy library such as =use-
 
 ** Intermittent eglot timeout errors
 
-You might want to set the value for the variable =eglot-sync-connect= to =0=.
-- Please consult inspect the relevant =eglot= documentation with =C-h v=.
+You might want to set the value of =eglot-sync-connect= or =eglot-connect-timeout=.
+- Please consult inspect the relevant variable documentation documentation with =C-h v=.
 - See also https://github.com/joaotavora/eglot/issues/68
+- See also https://github.com/joaotavora/eglot/issues/1342
 
 ** Gradle projects
 
