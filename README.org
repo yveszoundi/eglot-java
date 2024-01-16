@@ -100,9 +100,9 @@ As of =eglot-java 1.11= (December 2023), only milestones releases will be instal
 
 Sometimes you may want to add/modify [[https://github.com/eclipse-jdtls/eclipse.jdt.ls/wiki/Running-the-JAVA-LS-server-from-the-command-line#initialize-request][LSP server initialization settings]].
 
-- For basic flexibility, you can control the =settings= node of the LSP server configuration via the variable [[https://www.gnu.org/software/emacs/manual/html_node/eglot/User_002dspecific-configuration.html][eglot-workspace-configuration]].
-- For greater flexibility, you can leverage the =eglot-java-user-init-opts-fn= variable.
-  - You'll need to bind the value of =eglot-java-user-init-opts-fn= with your own callback function.
+- For basic flexibility, you can control the =settings= node of the LSP server configuration via the variable [[https://www.gnu.org/software/emacs/manual/html_node/eglot/User_002dspecific-configuration.html][eglot-workspace-configuration]]. This is best suited for project-specific configuration.
+- For greater flexibility, you can leverage the =eglot-java-user-init-opts-fn= variable
+  - You'll need to bind the value of =eglot-java-user-init-opts-fn= with your own callback function
   - You'll need to return a [[https://www.gnu.org/software/emacs/manual/html_node/elisp/Property-Lists.html][property list]] of valid JDT LS settings (merged with defaults):
     - In =eglot= keys (property names) are keywords symbols (e.g., =:key=)
     - Instead of curly braces in JSON, you use nested parenthesis (e.g., =(:java (:home "/usr/share/jdk21"))=)
@@ -129,11 +129,19 @@ The list of LSP server settings is available in the [[https://github.com/eclipse
 Per general Eclipse JDT LS documentation, a basic skeleton of an initialization customization could look as follow:
 
 #+begin_src emacs-lisp
-  '(:bundles: ["/home/me/lsp-server/bundles/my-lsp-extension.jar"]
+  '(:bundles: ["/home/me/.emacs.d/lsp-bundles/com.microsoft.java.debug.plugin-0.50.0.jar"]
     :workspaceFolders: ["file:///home/me/Projects/mavenproject"]
     :settings: (:java (:home "/usr/local/jdk21"))
     :extendedClientCapabilities (:classFileContentsSupport t))
 #+end_src
+
+** Debugging support
+
+Please first setup the LSP =:bundles= in custom LSP initializing settings (per previous example)
+- You can download the latest version of the [[https://github.com/microsoft/java-debug][Microsoft Debug Adapter Protocol (DAP)]] jar from [[https://repo1.maven.org/maven2/com/microsoft/java/com.microsoft.java.debug.plugin/][Maven central]]
+- I then recommend installing [[https://github.com/svaante/dape][dape]]
+  - The package is available on [[https://elpa.gnu.org/packages/dape.html][GNU ELPA]] (=M-x package-install=)
+  - Utility functions developed by [[https://github.com/MagielBruntink/dape/blob/jdtls-extension/dape-jdtls.el][MagielBruntink]] can be of great inspiration for your configuration
 
 * Contributing
 
