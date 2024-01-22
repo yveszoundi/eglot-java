@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2019-2024 Yves Zoundi
 
-;; Version: 1.24
+;; Version: 1.25
 ;; Author: Yves Zoundi <yves_zoundi@hotmail.com>
 ;; Maintainer: Yves Zoundi <yves_zoundi@hotmail.com>
 ;; URL: https://github.com/yveszoundi/eglot-java
@@ -104,7 +104,11 @@
   :group 'eglot-java)
 
 (defcustom eglot-java-eclipse-jdt-args
-  '()
+  '("--add-modules=ALL-SYSTEM"
+    "--add-opens"
+    "java.base/java.util=ALL-UNNAMED"
+    "--add-opens"
+    "java.base/java.lang=ALL-UNNAMED")
   "Eclipse JDT JVM arguments."
   :type '(repeat string)
   :risky t
@@ -113,7 +117,7 @@
 (defcustom eglot-java-java-home
   nil
   "Custom JAVA_HOME location."
-  :type 'diectory
+  :type 'directory
   :group 'eglot-java)
 
 (defcustom eglot-java-java-program
@@ -151,6 +155,7 @@
   "https://repo1.maven.org/maven2"
   "Maven repository root URL."
   :type 'string
+  :risky t
   :group 'eglot-java)
 
 (defcustom eglot-java-server-install-dir
@@ -170,6 +175,7 @@
   '("_links" "dependencies")
   "Excluded input parameters."
   :type '(repeat string)
+  :risky t
   :group 'eglot-java)
 
 (defcustom eglot-java-spring-starter-url-projectdef
