@@ -67,6 +67,12 @@ Below is a sample minimal configuration, without any fancy library such as =use-
 
 * Other notes
 
+** LSP server startup errors
+
+Usually this is due to starting the LSP server with an old Java version (see issue [[https://github.com/yveszoundi/eglot-java/issues/29][#29]]).
+- Please ensure that your JVM version meets the [[https://github.com/eclipse-jdtls/eclipse.jdt.ls#requirements][compatibility requirements]] for the [[https://projects.eclipse.org/projects/eclipse.jdt.ls][Eclipse JDT LS server]].
+- As of early 2024, you need to start the LSP server with =JDK 17= or later.
+
 ** Intermittent eglot timeout errors
 
 You might want to set the value of =eglot-sync-connect= or =eglot-connect-timeout=.
