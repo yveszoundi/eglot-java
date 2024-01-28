@@ -675,7 +675,8 @@ METADATA-XML-URL is the Maven URL containing a maven-metadata.xml file for the a
 (defun eglot-java-run-test ()
   "Run a test class."
   (interactive)
-  (let* ((fqcn                 (or (eglot-java--find-nearest-method-at-point) (eglot-java--class-fqcn)))
+  (let* ((default-directory    (project-root (project-current t)))
+         (fqcn                 (or (eglot-java--find-nearest-method-at-point) (eglot-java--class-fqcn)))
          (cp                   (eglot-java--project-classpath (buffer-file-name) "test"))
          (current-file-is-test (not (equal ':json-false (eglot-java--file--test-p (buffer-file-name))))))
     (unless (file-exists-p (expand-file-name eglot-java-junit-platform-console-standalone-jar))
@@ -698,8 +699,9 @@ METADATA-XML-URL is the Maven URL containing a maven-metadata.xml file for the a
 (defun eglot-java-run-main ()
   "Run a main class."
   (interactive)
-  (let* ((fqcn (eglot-java--class-fqcn))
-         (cp   (eglot-java--project-classpath (buffer-file-name) "runtime")))
+  (let* ((default-directory (project-root (project-current t)))
+         (fqcn              (eglot-java--class-fqcn))
+         (cp                (eglot-java--project-classpath (buffer-file-name) "runtime")))
     (if fqcn
         (compile
          (concat (eglot-java--find-java-program-from-alternatives)
