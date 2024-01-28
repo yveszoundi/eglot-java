@@ -700,8 +700,7 @@ METADATA-XML-URL is the Maven URL containing a maven-metadata.xml file for the a
                  fqcn
                  " -class-path "
                  "\"" (mapconcat #'identity cp path-separator) "\""
-                 " ")
-         t)
+                 " "))
       (user-error "No test found in current file! Is the file saved?"))))
 
 (defun eglot-java-run-main (debug)
@@ -717,8 +716,7 @@ METADATA-XML-URL is the Maven URL containing a maven-metadata.xml file for the a
                  " -cp "
                  "\"" (mapconcat #'identity cp path-separator) "\""
                  " "
-                 fqcn)
-         t)
+                 fqcn))
       (user-error "No main method found in this file! Is the file saved?"))))
 
 (defun eglot-java--class-fqcn ()
