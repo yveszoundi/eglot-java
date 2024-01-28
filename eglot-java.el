@@ -202,6 +202,12 @@
   :type 'symbol
   :group 'eglot-java)
 
+(defcustom eglot-java-debug-jvm-arguments
+  "-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=localhost:8000"
+  "JVM arguments to start the debugger."
+  :type 'string
+  :group 'eglot-java)
+
 (defconst eglot-java-filename-build-maven          "pom.xml"                   "Maven build file name.")
 (defconst eglot-java-filename-build-gradle-groovy  "build.gradle"              "Gradle build file name with Groovy.")
 (defconst eglot-java-filename-build-gradle-kotlin  "build.gradle.kts"          "Gradle build file name with Kotlin.")
@@ -672,9 +678,9 @@ METADATA-XML-URL is the Maven URL containing a maven-metadata.xml file for the a
     (eglot-java--download-file download-url (expand-file-name junit-jar-path))
     (eglot-java--record-version-info download-version version-file)))
 
-(defun eglot-java-run-test ()
+(defun eglot-java-run-test (debug)
   "Run a test class."
-  (interactive)
+  (interactive "P")
   (let* ((default-directory    (project-root (project-current t)))
          (fqcn                 (or (eglot-java--find-nearest-method-at-point) (eglot-java--class-fqcn)))
          (cp                   (eglot-java--project-classpath (buffer-file-name) "test"))
@@ -684,6 +690,7 @@ METADATA-XML-URL is the Maven URL containing a maven-metadata.xml file for the a
     (if current-file-is-test
         (compile
          (concat (eglot-java--find-java-program-from-alternatives)
+                 (when debug (concat " " eglot-java-debug-jvm-arguments " "))
                  " -jar "
                  "\"" (expand-file-name eglot-java-junit-platform-console-standalone-jar) "\""
                  " execute "
@@ -697,15 +704,16 @@ METADATA-XML-URL is the Maven URL containing a maven-metadata.xml file for the a
          t)
       (user-error "No test found in current file! Is the file saved?"))))
 
-(defun eglot-java-run-main ()
+(defun eglot-java-run-main (debug)
   "Run a main class."
-  (interactive)
+  (interactive "P")
   (let* ((default-directory (project-root (project-current t)))
          (fqcn              (eglot-java--class-fqcn))
          (cp                (eglot-java--project-classpath (buffer-file-name) "runtime")))
     (if fqcn
         (compile
          (concat (eglot-java--find-java-program-from-alternatives)
+                 (when debug (concat " " eglot-java-debug-jvm-arguments " "))
                  " -cp "
                  "\"" (mapconcat #'identity cp path-separator) "\""
                  " "
