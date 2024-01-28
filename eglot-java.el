@@ -199,7 +199,7 @@
 (defcustom eglot-java-user-init-opts-fn
   nil
   "User-defined function returning a property list of LSP server initialization options. The callback accepts 2 parameters (server eglot-java-eclipse-jdt)."
-  :type 'symbol
+  :type 'function
   :group 'eglot-java)
 
 (defconst eglot-java-filename-build-maven          "pom.xml"                   "Maven build file name.")
