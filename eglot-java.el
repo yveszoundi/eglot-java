@@ -686,6 +686,7 @@ METADATA-XML-URL is the Maven URL containing a maven-metadata.xml file for the a
          (concat (eglot-java--find-java-program-from-alternatives)
                  " -jar "
                  "\"" (expand-file-name eglot-java-junit-platform-console-standalone-jar) "\""
+                 " execute "
                  (if (string-match-p "#" fqcn)
                      " -m "
                    " -c ")
