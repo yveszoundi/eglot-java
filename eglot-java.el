@@ -95,7 +95,8 @@
   nil
   "Interaction with a Java language server via eglot."
   :prefix "eglot-java-"
-  :group 'eglot)
+  :group 'eglot  
+  :link '(url-link :tag "Github" "https://github.com/yveszoundi/eglot-java"))
 
 (defcustom eglot-java-eglot-server-programs-manual-updates
   nil
@@ -162,8 +163,7 @@
   (concat user-emacs-directory "share/eclipse.jdt.ls")
   "Location of the Eclipse Java language server installation."
   :type 'directory
-  :group 'eglot-java
-  :link '(url-link :tag "Github" "https://github.com/yveszoundi/eglot-java"))
+  :group 'eglot-java)
 
 (defcustom eglot-java-junit-platform-console-standalone-jar
   (concat user-emacs-directory "share/junit-platform-console-standalone/junit-platform-console-standalone.jar")
