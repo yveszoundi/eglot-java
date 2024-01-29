@@ -908,7 +908,7 @@ METADATA-XML-URL is the Maven URL containing a maven-metadata.xml file for the a
   "Start a compilation from a direction INITIAL-DIR with a given command string CMD and its arguments string ARGS."
   (let ((mvn-cmd           (concat cmd " " args))
         (default-directory initial-dir))
-    (compile mvn-cmd t)))
+    (compile mvn-cmd)))
 
 (defun eglot-java--build-executable(cmd cmd-wrapper-name cmd-wrapper-dir)
   "Return the command to run, either the initial command itself CMD or its wrapper equivalent (CMD-WRAPPER-NAME) if found in CMD-WRAPPER-DIR."
