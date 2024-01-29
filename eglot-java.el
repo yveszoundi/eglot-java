@@ -202,9 +202,39 @@
   :type 'symbol
   :group 'eglot-java)
 
-(defcustom eglot-java-debug-jvm-arguments
+(defcustom eglot-java-run-main-args
+  nil
+  "Arguments for the main class. List of strings."
+  :type '(repeat string)
+  :group 'eglot-java)
+
+(defcustom eglot-java-run-main-jvm-args
+  nil
+  "JVM arguments for running the main class. List of strings."
+  :type '(repeat string)
+  :group 'eglot-java)
+
+(defcustom eglot-java-run-main-env
+  nil
+  "Environment for running main. List of strings of the form ENVVARNAME=VALUE."
+  :type '(repeat string)
+  :group 'eglot-java)
+
+(defcustom eglot-java-run-test-jvm-args
+  nil
+  "JVM arguments for running tests. List of strings."
+  :type '(repeat string)
+  :group 'eglot-java)
+
+(defcustom eglot-java-run-test-env
+  nil
+  "Environment for running tests. List of strings of the form ENVVARNAME=VALUE."
+  :type '(repeat string)
+  :group 'eglot-java)
+
+(defcustom eglot-java-debug-jvm-arg
   "-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=localhost:8000"
-  "JVM arguments to start the debugger."
+  "JVM argument to start the debugger."
   :type 'string
   :group 'eglot-java)
 
@@ -689,35 +719,43 @@ JVM is started in debug mode."
     (unless (file-exists-p (expand-file-name eglot-java-junit-platform-console-standalone-jar))
       (eglot-java--install-junit-jar eglot-java-junit-platform-console-standalone-jar))
     (if current-file-is-test
-        (compile
-         (concat (eglot-java--find-java-program-from-alternatives)
-                 (when debug (concat " " eglot-java-debug-jvm-arguments " "))
-                 " -jar "
-                 "\"" (expand-file-name eglot-java-junit-platform-console-standalone-jar) "\""
-                 " execute "
-                 (if (string-match-p "#" fqcn)
-                     " -m "
-                   " -c ")
-                 fqcn
-                 " -class-path "
-                 "\"" (mapconcat #'identity cp path-separator) "\""
-                 " "))
+        (let ((compilation-environment eglot-java-run-test-env))
+          (compile
+           (concat (eglot-java--find-java-program-from-alternatives)
+                   (when debug (concat " " eglot-java-debug-jvm-arg))
+                   " "
+                   (mapconcat #'identity eglot-java-run-test-jvm-args " ")
+                   " -jar "
+                   "\"" (expand-file-name eglot-java-junit-platform-console-standalone-jar) "\""
+                   " execute "
+                   (if (string-match-p "#" fqcn)
+                       " -m "
+                     " -c ")
+                   fqcn
+                   " -class-path "
+                   "\"" (mapconcat #'identity cp path-separator) "\"")))
       (user-error "No test found in current file! Is the file saved?"))))
 
 (defun eglot-java-run-main (debug)
-  "Run a main class."
+  "Run a main class. With a prefix argument the JVM is started in
+debug mode."
   (interactive "P")
   (let* ((default-directory (project-root (project-current t)))
          (fqcn              (eglot-java--class-fqcn))
          (cp                (eglot-java--project-classpath (buffer-file-name) "runtime")))
     (if fqcn
-        (compile
-         (concat (eglot-java--find-java-program-from-alternatives)
-                 (when debug (concat " " eglot-java-debug-jvm-arguments " "))
-                 " -cp "
-                 "\"" (mapconcat #'identity cp path-separator) "\""
-                 " "
-                 fqcn))
+        (let ((compilation-environment eglot-java-run-main-env))
+          (compile
+           (concat (eglot-java--find-java-program-from-alternatives)
+                   (when debug (concat " " eglot-java-debug-jvm-arg))
+                   " "
+                   (mapconcat #'identity eglot-java-run-main-jvm-args " ")
+                   " -cp "
+                   "\"" (mapconcat #'identity cp path-separator) "\""
+                   " "
+                   fqcn
+                   " "
+                   (mapconcat #'identity eglot-java-run-main-args " "))))
       (user-error "No main method found in this file! Is the file saved?"))))
 
 (defun eglot-java--class-fqcn ()
