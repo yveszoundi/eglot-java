@@ -679,7 +679,8 @@ METADATA-XML-URL is the Maven URL containing a maven-metadata.xml file for the a
     (eglot-java--record-version-info download-version version-file)))
 
 (defun eglot-java-run-test (debug)
-  "Run a test class."
+  "Run a test class or method (at point). With a prefix argument the
+JVM is started in debug mode."
   (interactive "P")
   (let* ((default-directory    (project-root (project-current t)))
          (fqcn                 (or (eglot-java--find-nearest-method-at-point) (eglot-java--class-fqcn)))
