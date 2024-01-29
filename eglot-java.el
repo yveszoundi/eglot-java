@@ -995,12 +995,12 @@ debug mode."
          (build-cmd                 (if project-is-gradle-project
                                         (eglot-java--build-executable "gradle" "gradlew" project-dir)
                                       (eglot-java--build-executable "mvn" "mvnw" project-dir))))
-    (async-shell-command (format "%s %s %s %s"
-                                 build-cmd
-                                 build-filename-flag
-                                 (shell-quote-argument
-                                  (expand-file-name build-filename project-dir))
-                                 goal))))
+    (compile (format "%s %s %s %s"
+                     build-cmd
+                     build-filename-flag
+                     (shell-quote-argument
+                      (expand-file-name build-filename project-dir))
+                     goal))))
 
 (defun eglot-java--read-json-from-url (url)
   "Fetch the LSP server download metadata in JSON format.
