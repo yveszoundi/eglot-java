@@ -202,6 +202,42 @@
   :type 'function
   :group 'eglot-java)
 
+(defcustom eglot-java-run-main-args
+  nil
+  "Arguments for the main class. List of strings."
+  :type '(repeat string)
+  :group 'eglot-java)
+
+(defcustom eglot-java-run-main-jvm-args
+  nil
+  "JVM arguments for running the main class. List of strings."
+  :type '(repeat string)
+  :group 'eglot-java)
+
+(defcustom eglot-java-run-main-env
+  nil
+  "Environment for running main. List of strings of the form ENVVARNAME=VALUE."
+  :type '(repeat string)
+  :group 'eglot-java)
+
+(defcustom eglot-java-run-test-jvm-args
+  nil
+  "JVM arguments for running tests. List of strings."
+  :type '(repeat string)
+  :group 'eglot-java)
+
+(defcustom eglot-java-run-test-env
+  nil
+  "Environment for running tests. List of strings of the form ENVVARNAME=VALUE."
+  :type '(repeat string)
+  :group 'eglot-java)
+
+(defcustom eglot-java-debug-jvm-arg
+  "-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=localhost:8000"
+  "JVM argument to start the debugger."
+  :type 'string
+  :group 'eglot-java)
+
 (defconst eglot-java-filename-build-maven          "pom.xml"                   "Maven build file name.")
 (defconst eglot-java-filename-build-gradle-groovy  "build.gradle"              "Gradle build file name with Groovy.")
 (defconst eglot-java-filename-build-gradle-kotlin  "build.gradle.kts"          "Gradle build file name with Kotlin.")
@@ -672,42 +708,54 @@ METADATA-XML-URL is the Maven URL containing a maven-metadata.xml file for the a
     (eglot-java--download-file download-url (expand-file-name junit-jar-path))
     (eglot-java--record-version-info download-version version-file)))
 
-(defun eglot-java-run-test ()
-  "Run a test class."
-  (interactive)
-  (let* ((fqcn                 (or (eglot-java--find-nearest-method-at-point) (eglot-java--class-fqcn)))
+(defun eglot-java-run-test (debug)
+  "Run a test class or method (at point). With a prefix argument the
+JVM is started in debug mode."
+  (interactive "P")
+  (let* ((default-directory    (project-root (project-current t)))
+         (fqcn                 (or (eglot-java--find-nearest-method-at-point) (eglot-java--class-fqcn)))
          (cp                   (eglot-java--project-classpath (buffer-file-name) "test"))
          (current-file-is-test (not (equal ':json-false (eglot-java--file--test-p (buffer-file-name))))))
     (unless (file-exists-p (expand-file-name eglot-java-junit-platform-console-standalone-jar))
       (eglot-java--install-junit-jar eglot-java-junit-platform-console-standalone-jar))
     (if current-file-is-test
-        (compile
-         (concat (eglot-java--find-java-program-from-alternatives)
-                 " -jar "
-                 "\"" (expand-file-name eglot-java-junit-platform-console-standalone-jar) "\""
-                 (if (string-match-p "#" fqcn)
-                     " -m "
-                   " -c ")
-                 fqcn
-                 " -class-path "
-                 "\"" (mapconcat #'identity cp path-separator) "\""
-                 " ")
-         t)
+        (let ((compilation-environment eglot-java-run-test-env))
+          (compile
+           (concat (eglot-java--find-java-program-from-alternatives)
+                   (when debug (concat " " eglot-java-debug-jvm-arg))
+                   " "
+                   (mapconcat #'identity eglot-java-run-test-jvm-args " ")
+                   " -jar "
+                   "\"" (expand-file-name eglot-java-junit-platform-console-standalone-jar) "\""
+                   " execute "
+                   (if (string-match-p "#" fqcn)
+                       " -m "
+                     " -c ")
+                   fqcn
+                   " -class-path "
+                   "\"" (mapconcat #'identity cp path-separator) "\"")))
       (user-error "No test found in current file! Is the file saved?"))))
 
-(defun eglot-java-run-main ()
-  "Run a main class."
-  (interactive)
-  (let* ((fqcn (eglot-java--class-fqcn))
-         (cp   (eglot-java--project-classpath (buffer-file-name) "runtime")))
+(defun eglot-java-run-main (debug)
+  "Run a main class. With a prefix argument the JVM is started in
+debug mode."
+  (interactive "P")
+  (let* ((default-directory (project-root (project-current t)))
+         (fqcn              (eglot-java--class-fqcn))
+         (cp                (eglot-java--project-classpath (buffer-file-name) "runtime")))
     (if fqcn
-        (compile
-         (concat (eglot-java--find-java-program-from-alternatives)
-                 " -cp "
-                 "\"" (mapconcat #'identity cp path-separator) "\""
-                 " "
-                 fqcn)
-         t)
+        (let ((compilation-environment eglot-java-run-main-env))
+          (compile
+           (concat (eglot-java--find-java-program-from-alternatives)
+                   (when debug (concat " " eglot-java-debug-jvm-arg))
+                   " "
+                   (mapconcat #'identity eglot-java-run-main-jvm-args " ")
+                   " -cp "
+                   "\"" (mapconcat #'identity cp path-separator) "\""
+                   " "
+                   fqcn
+                   " "
+                   (mapconcat #'identity eglot-java-run-main-args " "))))
       (user-error "No main method found in this file! Is the file saved?"))))
 
 (defun eglot-java--class-fqcn ()
@@ -947,12 +995,12 @@ METADATA-XML-URL is the Maven URL containing a maven-metadata.xml file for the a
          (build-cmd                 (if project-is-gradle-project
                                         (eglot-java--build-executable "gradle" "gradlew" project-dir)
                                       (eglot-java--build-executable "mvn" "mvnw" project-dir))))
-    (async-shell-command (format "%s %s %s %s"
-                                 build-cmd
-                                 build-filename-flag
-                                 (shell-quote-argument
-                                  (expand-file-name build-filename project-dir))
-                                 goal))))
+    (compile (format "%s %s %s %s"
+                     build-cmd
+                     build-filename-flag
+                     (shell-quote-argument
+                      (expand-file-name build-filename project-dir))
+                     goal))))
 
 (defun eglot-java--read-json-from-url (url)
   "Fetch the LSP server download metadata in JSON format.
