@@ -8,21 +8,21 @@ This package provides additional Java programming language support for [[https:/
 - Few convenience functions are available for common operations such as creating a new project or class.
 - There are couple of customization options , including passing custom JVM arguments to the Eclipse JDT language server.
 - The [[https://github.com/eclipse/eclipse.jdt.ls][Eclipse JDT Language Server]] is automatically installed (if needed) when you open a Java file
-  - This installs the latest known milestone release (instead of the latest snapshot in earlier eglot-java versions)
-  - This gives you code completion, refactoring capabilities, etc.
+  - This retrieves the latest known milestone release (instead of the latest snapshot in earlier =eglot-java= versions)
+  - This gives you code completion, refactoring capabilities and other features.
 
-|------------------------------------+-------------------------------------------------------------------------+----------|
-| Function                           | Description                                                             | Autoload |
-|------------------------------------+-------------------------------------------------------------------------+----------|
-| =eglot-java-project-new=           | Create new projects with a wizard ([[https://start.spring.io/][Spring]], [[https://maven.apache.org/][Maven]] or [[https://gradle.org/][Gradle]] projects)    | NO       |
-| =eglot-java-project-build-refresh= | Rebuild the current project                                             | NO       |
-| =eglot-java-project-build-task=    | Run a build task using [[https://gradle.org/][Gradle]] or [[https://maven.apache.org/][Maven]] for the current project          | NO       |
-| =eglot-java-file-new=              | Wizard for creating new Java files                                      | NO       |
-| =eglot-java-run-main=              | Run the current main class                                              | NO       |
-| =eglot-java-run-test=              | Run the current test ([[https://junit.org/junit5/][JUnit]] only, unless you run Maven or Gradle tasks) | NO       |
-| =eglot-java-upgrade-lsp-server=    | Upgrade the LSP server installation                                     | YES      |
-| =eglot-java-upgrade-junit-jar=     | Upgrade the JUnit jar installation                                      | YES      |
-|------------------------------------+-------------------------------------------------------------------------+----------|
+|------------------------------------+---------------------------------------------------------------------------------+----------|
+| Function                           | Description                                                                     | Autoload |
+|------------------------------------+---------------------------------------------------------------------------------+----------|
+| =eglot-java-project-new=           | Create new projects with a wizard ([[https://start.spring.io/][Spring]], [[https://micronaut.io/][Micronaut]], [[https://quarkus.io/][Quarkus]], [[https://maven.apache.org/][Maven]] or [[https://gradle.org/][Gradle]]) | NO       |
+| =eglot-java-project-build-refresh= | Rebuild the current project                                                     | NO       |
+| =eglot-java-project-build-task=    | Run a build task using [[https://gradle.org/][Gradle]] or [[https://maven.apache.org/][Maven]] for the current project                  | NO       |
+| =eglot-java-file-new=              | Wizard for creating new Java files                                              | NO       |
+| =eglot-java-run-main=              | Run the current main class                                                      | NO       |
+| =eglot-java-run-test=              | Run the current test ([[https://junit.org/junit5/][JUnit]] only, unless you run Maven or Gradle tasks)         | NO       |
+| =eglot-java-upgrade-lsp-server=    | Upgrade the LSP server installation                                             | YES      |
+| =eglot-java-upgrade-junit-jar=     | Upgrade the JUnit jar installation                                              | YES      |
+|------------------------------------+---------------------------------------------------------------------------------+----------|
 
 * Dependencies
 
@@ -77,8 +77,7 @@ Usually this is due to starting the LSP server with an old Java version (see iss
 
 You might want to set the value of =eglot-sync-connect= or =eglot-connect-timeout=.
 - Please consult inspect the relevant variable documentation documentation with =C-h v=.
-- See also https://github.com/joaotavora/eglot/issues/68
-- See also https://github.com/joaotavora/eglot/issues/1342
+- See eglot issues [[https://github.com/joaotavora/eglot/issues/68][#68]] and [[https://github.com/joaotavora/eglot/issues/1342][1342]]
 
 ** Gradle projects
 
@@ -148,7 +147,7 @@ Please first setup the LSP =:bundles= in custom LSP initializing settings (per p
 - You can download the latest version of the [[https://github.com/microsoft/java-debug][Microsoft Debug Adapter Protocol (DAP)]] jar from [[https://repo1.maven.org/maven2/com/microsoft/java/com.microsoft.java.debug.plugin/][Maven central]]
 - I then recommend installing [[https://github.com/svaante/dape][dape]]
   - The package is available on [[https://elpa.gnu.org/packages/dape.html][GNU ELPA]] (=M-x package-install=)
-  - Utility functions developed by [[https://github.com/MagielBruntink/dape/blob/jdtls-extension/dape-jdtls.el][MagielBruntink]] can be of great inspiration for your configuration
+  - Utility functions developed by [[https://github.com/MagielBruntink/dape/blob/jdtls-extension/dape-jdtls.el][MagielBruntink]] can be useful
 
 * Contributing
 

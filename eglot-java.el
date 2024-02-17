@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2019-2024 Yves Zoundi
 
-;; Version: 1.26
+;; Version: 1.27
 ;; Author: Yves Zoundi <yves_zoundi@hotmail.com>
 ;; Maintainer: Yves Zoundi <yves_zoundi@hotmail.com>
 ;; URL: https://github.com/yveszoundi/eglot-java
@@ -29,7 +29,7 @@
 ;; Some of the key features include the following:
 ;; - Automatic installation of the Eclipse JDT LSP server (latest milestone release).
 ;; - Ability to pass JVM arguments to the Eclipse JDT LSP server (eglot-java-eclipse-jdt-args)
-;; - Wizards for Spring starter, Maven and Gradle project creation
+;; - Wizards for Spring Starter, Micronaut Launch, Quarkus.io, Maven and Gradle project creation
 ;; - Generic build command support for Maven and Gradle projects
 ;; - JUnit tests support, this hasn't been tested for a while...
 ;;
@@ -92,10 +92,10 @@
 (require 'json)
 
 (defgroup eglot-java
-  nil
+    nil
   "Interaction with a Java language server via eglot."
   :prefix "eglot-java-"
-  :group 'eglot  
+  :group 'eglot
   :link '(url-link :tag "Github" "https://github.com/yveszoundi/eglot-java"))
 
 (defcustom eglot-java-eglot-server-programs-manual-updates
@@ -184,6 +184,18 @@
   :type 'string
   :group 'eglot-java)
 
+(defcustom eglot-java-micronaut-starter-url-projectdef
+  "https://launch.micronaut.io"
+  "Start url."
+  :type 'string
+  :group 'eglot-java)
+
+(defcustom eglot-java-quarkus-starter-url-projectdef
+  "https://code.quarkus.io"
+  "Start url."
+  :type 'string
+  :group 'eglot-java)
+
 (defcustom eglot-java-spring-starter-url-starterzip
   "https://start.spring.io/starter.zip"
   "API endpoint to create a spring boot project."
@@ -244,7 +256,9 @@
 (defconst eglot-java-filename-version-jdtls        ".eglot-java-jdtls-version" "JDT LS version file name.")
 (defconst eglot-java-filename-version-junit        ".eglot-java-junit-version" "JUnit version file name.")
 
-(defvar eglot-java-spring-starter-jsontext nil "Spring IO JSON payload.")
+(defvar eglot-java-spring-starter-jsontext    nil "Spring IO JSON payload.")
+(defvar eglot-java-micronaut-starter-jsontext nil "Micronaut Launch JSON payload.")
+(defvar eglot-java-quarkus-starter-jsontext   nil "Quarkus IO JSON payload.")
 (defvar eglot-java-project-new-directory nil "The newly created java project directory location.")
 (make-variable-buffer-local 'eglot-java-project-new-directory)
 
@@ -356,25 +370,25 @@ ones and overrule settings in the other lists."
 If INTERACTIVE, prompt user for details."
   (cl-labels
       ((is-the-jar
-        (path)
-        (and (string-match-p
-              "org\\.eclipse\\.equinox\\.launcher_.*\\.jar$"
-              (file-name-nondirectory path))
-             (file-exists-p path))))
+           (path)
+         (and (string-match-p
+               "org\\.eclipse\\.equinox\\.launcher_.*\\.jar$"
+               (file-name-nondirectory path))
+              (file-exists-p path))))
     (let* ((classpath (or (getenv "CLASSPATH") path-separator))
            (cp-jar (cl-find-if #'is-the-jar (split-string classpath path-separator)))
            (jar cp-jar)
            (dir
             (cond
-             (jar (file-name-as-directory
-                   (expand-file-name ".." (file-name-directory jar))))
-             (interactive
-              (expand-file-name
-               (read-directory-name
-                (concat "Path to eclipse.jdt.ls directory (could not"
-                        " find it in CLASSPATH): ")
-                nil nil t)))
-             (t (error "Could not find eclipse.jdt.ls jar in CLASSPATH"))))
+              (jar (file-name-as-directory
+                    (expand-file-name ".." (file-name-directory jar))))
+              (interactive
+               (expand-file-name
+                (read-directory-name
+                 (concat "Path to eclipse.jdt.ls directory (could not"
+                         " find it in CLASSPATH): ")
+                 nil nil t)))
+              (t (error "Could not find eclipse.jdt.ls jar in CLASSPATH"))))
            (repodir
             (concat dir
                     "org.eclipse.jdt.ls.product/target/repository/"))
@@ -383,9 +397,9 @@ If INTERACTIVE, prompt user for details."
             (concat
              repodir
              (cond
-              ((string= system-type "darwin") "config_mac")
-              ((string= system-type "windows-nt") "config_win")
-              (t "config_linux"))))
+               ((string= system-type "darwin") "config_mac")
+               ((string= system-type "windows-nt") "config_win")
+               (t "config_linux"))))
            (workspace
             (expand-file-name (md5 (project-root (eglot--current-project)))
                               eglot-java-eclipse-jdt-cache-directory)))
@@ -415,7 +429,7 @@ If INTERACTIVE, prompt user for details."
               "-data" workspace))))))
 
 (cl-defmethod eglot-execute-command
-  ((_server eglot-java-eclipse-jdt) (_cmd (eql java.apply.workspaceEdit)) arguments)
+    ((_server eglot-java-eclipse-jdt) (_cmd (eql java.apply.workspaceEdit)) arguments)
   "Eclipse JDT breaks spec and replies with edits as arguments."
   (mapc #'eglot--apply-workspace-edit arguments))
 
@@ -469,7 +483,7 @@ Otherwise returns nil"
   (let ((cp (getenv "CLASSPATH")))
     (setenv "CLASSPATH" (concat cp path-separator (eglot-java--find-equinox-launcher)))
     (unwind-protect
-        (eglot-java--eclipse-jdt-contact nil)
+         (eglot-java--eclipse-jdt-contact nil)
       (setenv "CLASSPATH" cp))))
 
 (defun eglot-java--project-name-maven (root)
@@ -550,11 +564,11 @@ Otherwise the basename of the folder ROOT will be returned."
                                size 6
                                test equal
                                data ("Class"      "public class %s {\n\n}"
-                                     "Record"     "public record %s () {}"
-                                     "Enum"       "public enum %s {\n\n}"
-                                     "Interface"  "public interface %s {\n\n}"
-                                     "Annotation" "public @interface %s {\n\n}"
-                                     "Test"       "import org.junit.jupiter.api.Assertions;\n
+                                                  "Record"     "public record %s () {}"
+                                                  "Enum"       "public enum %s {\n\n}"
+                                                  "Interface"  "public interface %s {\n\n}"
+                                                  "Annotation" "public @interface %s {\n\n}"
+                                                  "Test"       "import org.junit.jupiter.api.Assertions;\n
 import org.junit.jupiter.api.Test;\n\npublic class %s {\n\n}")))
          (source-list       (eglot-execute-command
                              (eglot--current-server-or-lose)
@@ -787,23 +801,27 @@ debug mode."
    :textDocument/documentSymbol
    (list :textDocument (list :uri (eglot--path-to-uri (buffer-file-name))))))
 
-(defun eglot-java--get-spring-initializr-json (url)
-  "Retrieve the Spring initializr JSON model from a given URL."
+(defun eglot-java--get-initializr-json (url accept-header)
+  "Retrieve the Spring initializr JSON model from a given URL and ACCEPT-HEADER."
   (let ((url-request-method        "GET")
-        (url-request-extra-headers '(("Accept" . "application/vnd.initializr.v2.2+json")))
+        (url-request-extra-headers `(("Accept" . ,accept-header)))
         (url-request-data          (mapconcat (lambda (arg)
                                                 (concat (url-hexify-string (car arg))
                                                         "="
                                                         (url-hexify-string (cdr arg))))
                                               (list)
-                                              "&")))    
+                                              "&")))
     (message "Downloading spring initializr JSON data...")
     (eglot-java--read-json-from-url url)))
 
 (defun eglot-java-project-new ()
   "Create a new Java project."
   (interactive)
-  (let ((project-type (completing-read "Project Type: " '("spring" "maven" "gradle") nil t "spring")))
+  (let ((project-type (completing-read "Project Type: "
+                                       '("spring" "maven" "gradle" "micronaut" "quarkus")
+                                       nil
+                                       t
+                                       "spring")))
     (funcall (intern (concat "eglot-java--project-new-" project-type)))))
 
 (defun eglot-java--project-new-maven ()
@@ -870,11 +888,109 @@ debug mode."
 
       (set-process-sentinel (get-buffer-process b) #'eglot-java--project-new-process-sentinel))))
 
+(defun eglot-java--cache-micronaut-options (root-url)
+  "Cache Micronaut Launcher app settings from an Web location at ROOT-URL."
+  (let* ((select-opts-response (eglot-java--get-initializr-json
+                                (concat root-url "/select-options")
+                                "application/json"))
+         (ht (make-hash-table :test 'equal))
+         (ht-opts (make-hash-table :test 'equal :size 10))
+         (ht-features (make-hash-table :test 'equal :size 10)))
+    (maphash (lambda (key value)
+               (puthash key
+                        (list :default (gethash "value" (gethash "defaultOption" value))
+                              :options (mapcar (lambda (elt)
+                                                 (gethash "value" elt))
+                                               (gethash "options" value)))
+                        ht-opts))
+             select-opts-response)
+    (puthash :options ht-opts ht)
+    (let ((ht-features (make-hash-table :test 'equal :size 10)))
+      (mapc (lambda (elt)
+              (let* ((url (concat root-url "/application-types/" elt "/features"))
+                     (response (eglot-java--get-initializr-json url "application/json"))
+                     (app-feats (make-hash-table :test 'equal :size 10)))
+                (mapc (lambda (feature)
+                        (puthash (gethash "title" feature) (gethash "name" feature) app-feats))
+                      (gethash "features" response))
+                (puthash elt app-feats ht-features)))
+            (plist-get  (gethash "type" ht-opts) :options))
+      (puthash  :features ht-features ht)
+      ht)))
+
+(defun eglot-java--project-new-micronaut ()
+  "Create a new Micronaut project using Micronaut Launch app."
+  (unless eglot-java-micronaut-starter-jsontext
+    (setq eglot-java-micronaut-starter-jsontext (eglot-java--cache-micronaut-options eglot-java-micronaut-starter-url-projectdef)))
+
+  (let* ((cc eglot-java-micronaut-starter-jsontext)
+         (cc-opts (gethash :options cc))
+         (cc-feats (gethash :features cc))
+         (texts-opts #s(hash-table test equal
+                                   data ("name" (:title "Name" :value "demo")
+                                                "package" (:title "Base Package" :value "com.example"))))
+         (texts (make-hash-table :test 'equal))
+         (selects (make-hash-table :test 'equal))
+         (feats (list)))
+    (maphash (lambda (k v)
+               (puthash k
+                        (read-string (format "%s : " (plist-get v :title))
+                                     (plist-get v :value))
+                        texts))
+             texts-opts)
+    (maphash (lambda (k v)
+               (puthash k
+                        (completing-read (format "Select %s: " k)
+                                         (plist-get v :options)
+                                         nil
+                                         t
+                                         (plist-get v :default))
+                        selects))
+             cc-opts)
+
+    (let ((featz (gethash (gethash "type" selects) cc-feats)))
+      (mapc (lambda (item)
+              (add-to-list 'feats (gethash item featz)))
+            (completing-read-multiple "Select features (comma separated, TAB to add more): "
+                                      (hash-table-keys featz)
+                                      nil
+                                      t))
+      (let ((app-type (gethash "type" selects))
+            (app-name (gethash "name" texts))
+            (app-pkg (gethash "package" texts))
+            (new-selects (list))
+            (dest-dir     (read-directory-name "Project Parent directory: "
+                                               (expand-file-name
+                                                eglot-java-workspace-folder))))
+        (remhash "type" selects)
+        (maphash (lambda (k v)
+                   (add-to-list 'new-selects (list k v)))
+                 selects)
+        (unless (file-exists-p dest-dir)
+          (make-directory dest-dir t))
+        (let ((dest-file-name (expand-file-name (concat (format-time-string "%Y-%m-%d_%N") ".zip")
+                                                dest-dir))
+              (source-url (format "%s/create/%s/%s?%s"
+                                  eglot-java-micronaut-starter-url-projectdef
+                                  app-type
+                                  (concat app-pkg
+                                          (if (= (length app-pkg) 0)
+                                              ""
+                                            ".")
+                                          app-name)
+                                  (url-build-query-string
+                                   (append new-selects
+                                           (list
+                                            (list "features" (mapconcat 'identity feats ","))))))))
+          (url-copy-file source-url dest-file-name t)
+          (dired (file-name-directory dest-file-name))
+          (revert-buffer))))))
+
 (defun eglot-java--project-new-spring ()
   "Create a new Spring java project using spring initializr. User input parameters are extracted from the JSON structure."
   (unless eglot-java-spring-starter-jsontext
     (setq eglot-java-spring-starter-jsontext
-          (eglot-java--get-spring-initializr-json eglot-java-spring-starter-url-projectdef)))
+          (eglot-java--get-initializr-json eglot-java-spring-starter-url-projectdef "application/vnd.initializr.v2.2+json")))
 
   (let* ((elems         (cl-remove-if
                          (lambda (node-name)
@@ -914,7 +1030,7 @@ debug mode."
                                                            (lambda (x)
                                                              (gethash "values" x))
                                                            (gethash "values"  (gethash "dependencies" eglot-java-spring-starter-jsontext )))))))
-         (dest-dir     (read-directory-name "Project directory: "
+         (dest-dir     (read-directory-name "Project Directory: "
                                             (expand-file-name (cadr (assoc "artifactId" simple-params)) eglot-java-workspace-folder))))
 
     (unless (file-exists-p dest-dir)
@@ -932,6 +1048,63 @@ debug mode."
                                                                           #'identity
                                                                           (nconc simple-deps)
                                                                           "," ))))))))
+      (url-copy-file source-url dest-file-name t)
+      (dired (file-name-directory dest-file-name))
+      (revert-buffer))))
+
+(defun eglot-java--cache-quarkus-options (root-url)
+  "Cache Quarkus IO app settings from an Web location at ROOT-URL."
+  (let* ((response-streams (eglot-java--get-initializr-json
+                            (concat root-url "/api/streams") "application/json"))
+         (ret (make-hash-table :test 'equal)))
+    (dolist (item response-streams)
+      (let ((stream-id (gethash "key" item))
+            (quarkus-version (gethash "quarkusCoreVersion" item))
+            (java-versions (gethash "versions" (gethash "javaCompatibility" item))))
+        (puthash quarkus-version (list :stream-id stream-id :java-versions java-versions) ret)))
+    ret))
+
+(defun eglot-java--project-new-quarkus ()
+  "Create a new Quarkus java project using code.quarkus.io."
+  (unless eglot-java-quarkus-starter-jsontext
+    (setq eglot-java-quarkus-starter-jsontext
+          (eglot-java--cache-quarkus-options eglot-java-quarkus-starter-url-projectdef)))
+  (let* ((version         (read-string "Version: " "1.1.0-SNAPSHOT"))
+         (artifact-id     (read-string "Artifact: " "code-with-quarkus"))
+         (quarkus-version (completing-read "Quarkus Version: "
+                                           (hash-table-keys eglot-java-quarkus-starter-jsontext)
+                                           nil
+                                           t))
+         (java-version   (completing-read "Java Version: "
+                                          (mapcar 'int-to-string
+                                                  (plist-get (gethash quarkus-version eglot-java-quarkus-starter-jsontext)
+                                                             :java-versions))
+
+                                          nil
+                                          t))
+         (stream-id (plist-get (gethash quarkus-version eglot-java-quarkus-starter-jsontext)
+                               :stream-id))
+         (group-id    (read-string "Group: " "org.acme"))
+         (build-tool  (completing-read "Build Tool: "
+                                       '("MAVEN" "GRADLE_KOTLIN_DSL" "GRADLE")
+                                       nil
+                                       t))
+         (dest-dir     (read-directory-name "Project Parent Directory: "
+                                            (expand-file-name eglot-java-workspace-folder))))
+    (unless (file-exists-p dest-dir)
+      (make-directory dest-dir t))
+
+    (let ((large-file-warning-threshold nil)
+          (dest-file-name (expand-file-name (concat (format-time-string "%Y-%m-%d_%N") ".zip")
+                                            dest-dir))
+          (source-url     (format "%s/api/download?%s"
+                                  eglot-java-quarkus-starter-url-projectdef
+                                  (url-build-query-string (list
+                                                           (list "S" stream-id)
+                                                           (list "a" artifact-id)
+                                                           (list "g" group-id)
+                                                           (list "b" build-tool)
+                                                           (list "V" version))))))
       (url-copy-file source-url dest-file-name t)
       (dired (file-name-directory dest-file-name))
       (revert-buffer))))
@@ -1057,10 +1230,10 @@ METADATA is the JSON API response contents."
   "Upgrade the LSP server installation in a given directory.
 INSTALL-DIR is the directory where the LSP server will be upgraded."
   (let* ((buffers-managed (cl-loop for buf in (buffer-list)
-                                   if (with-current-buffer buf
-                                        (when eglot-java-mode
-                                          buf))
-                                   collect buf))
+                                if (with-current-buffer buf
+                                     (when eglot-java-mode
+                                       buf))
+                                collect buf))
          (time-cur        (current-time))
          (tmp-folder-name (format "jdtls-%d-%d" (car time-cur) (cadr time-cur)))
          (install-dir-tmp (expand-file-name tmp-folder-name (temporary-file-directory))))
@@ -1259,7 +1432,7 @@ handle it. If it is not a jar call ORIGINAL-FN."
 
 ;;;###autoload
 (define-minor-mode eglot-java-mode
-  "Toggle eglot-java-mode."
+    "Toggle eglot-java-mode."
   ;; The initial value.
   :init-value nil
   ;; The indicator for the mode line.
