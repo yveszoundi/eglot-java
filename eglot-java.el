@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2019-2024 Yves Zoundi
 
-;; Version: 1.27
+;; Version: 1.28
 ;; Author: Yves Zoundi <yves_zoundi@hotmail.com>
 ;; Maintainer: Yves Zoundi <yves_zoundi@hotmail.com>
 ;; URL: https://github.com/yveszoundi/eglot-java
@@ -1054,14 +1054,24 @@ debug mode."
 
 (defun eglot-java--cache-quarkus-options (root-url)
   "Cache Quarkus IO app settings from an Web location at ROOT-URL."
-  (let* ((response-streams (eglot-java--get-initializr-json
-                            (concat root-url "/api/streams") "application/json"))
-         (ret (make-hash-table :test 'equal)))
+  (let* ((response-streams            (eglot-java--get-initializr-json
+                                       (concat root-url "/api/streams") "application/json"))
+         (response-extensions         (eglot-java--get-initializr-json
+                                       (concat root-url "/api/extensions?platformOnly=true") "application/json"))
+         (metadata-by-quarkus-version (make-hash-table :test 'equal))
+         (extension-id-by-name        (make-hash-table :test 'equal))
+         (ret                         (make-hash-table :test 'equal)))
     (dolist (item response-streams)
       (let ((stream-id (gethash "key" item))
             (quarkus-version (gethash "quarkusCoreVersion" item))
             (java-versions (gethash "versions" (gethash "javaCompatibility" item))))
-        (puthash quarkus-version (list :stream-id stream-id :java-versions java-versions) ret)))
+        (puthash quarkus-version (list :stream-id stream-id :java-versions java-versions) metadata-by-quarkus-version)))
+    (dolist (item response-extensions)
+      (let ((extension-id (gethash "id" item))
+            (extension-name (gethash "name" item)))
+        (puthash extension-name extension-id extension-id-by-name)))
+    (puthash :metadata-by-quarkus-version metadata-by-quarkus-version ret)
+    (puthash :extension-id-by-name extension-id-by-name ret)    
     ret))
 
 (defun eglot-java--project-new-quarkus ()
@@ -1069,42 +1079,56 @@ debug mode."
   (unless eglot-java-quarkus-starter-jsontext
     (setq eglot-java-quarkus-starter-jsontext
           (eglot-java--cache-quarkus-options eglot-java-quarkus-starter-url-projectdef)))
-  (let* ((version         (read-string "Version: " "1.1.0-SNAPSHOT"))
-         (artifact-id     (read-string "Artifact: " "code-with-quarkus"))
-         (quarkus-version (completing-read "Quarkus Version: "
-                                           (hash-table-keys eglot-java-quarkus-starter-jsontext)
-                                           nil
-                                           t))
-         (java-version   (completing-read "Java Version: "
-                                          (mapcar 'int-to-string
-                                                  (plist-get (gethash quarkus-version eglot-java-quarkus-starter-jsontext)
-                                                             :java-versions))
-
-                                          nil
-                                          t))
-         (stream-id (plist-get (gethash quarkus-version eglot-java-quarkus-starter-jsontext)
-                               :stream-id))
-         (group-id    (read-string "Group: " "org.acme"))
-         (build-tool  (completing-read "Build Tool: "
-                                       '("MAVEN" "GRADLE_KOTLIN_DSL" "GRADLE")
-                                       nil
-                                       t))
-         (dest-dir     (read-directory-name "Project Parent Directory: "
-                                            (expand-file-name eglot-java-workspace-folder))))
+  (let* ((metadata-by-quarkus-version      (gethash :metadata-by-quarkus-version eglot-java-quarkus-starter-jsontext))
+         (extension-id-by-name             (gethash :extension-id-by-name eglot-java-quarkus-starter-jsontext))
+         (version                          (read-string "Version: " "1.1.0-SNAPSHOT"))
+         (artifact-id                      (read-string "Artifact: " "code-with-quarkus"))
+         (group-id                         (read-string "Group: " "org.acme"))
+         (build-tool                       (completing-read "Build Tool: "
+                                                            '("MAVEN" "GRADLE_KOTLIN_DSL" "GRADLE")
+                                                            nil
+                                                            t
+                                                            "GRADLE_KOTLIN_DSL"))
+         (quarkus-version                  (completing-read "Quarkus Version: "
+                                                            (hash-table-keys metadata-by-quarkus-version)
+                                                            nil
+                                                            t))
+         (java-version                     (completing-read "Java Version: "
+                                                            (mapcar 'int-to-string
+                                                                    (plist-get (gethash quarkus-version metadata-by-quarkus-version)
+                                                                               :java-versions))
+                                                            nil
+                                                            t))
+         (extension-names                  (completing-read-multiple "Select extensions (comma separated, TAB to add more): "
+                                                                     (hash-table-keys extension-id-by-name)
+                                                                     nil
+                                                                     t))
+         (extension-ids                    (mapcar (lambda (item)
+                                                     (list "e" (gethash item extension-id-by-name)))
+                                                   extension-names))
+         (stream-id                        (plist-get (gethash quarkus-version metadata-by-quarkus-version)
+                                                      :stream-id))         
+         (dest-dir                         (read-directory-name "Project Parent Directory: "
+                                                                (expand-file-name eglot-java-workspace-folder))))
     (unless (file-exists-p dest-dir)
       (make-directory dest-dir t))
-
     (let ((large-file-warning-threshold nil)
           (dest-file-name (expand-file-name (concat (format-time-string "%Y-%m-%d_%N") ".zip")
                                             dest-dir))
           (source-url     (format "%s/api/download?%s"
                                   eglot-java-quarkus-starter-url-projectdef
-                                  (url-build-query-string (list
-                                                           (list "S" stream-id)
-                                                           (list "a" artifact-id)
-                                                           (list "g" group-id)
-                                                           (list "b" build-tool)
-                                                           (list "V" version))))))
+                                  (mapconcat (lambda (item)
+                                               (format "%s=%s" (car item) (cadr item)))                                             
+                                             (append extension-ids
+                                                     (list
+                                                      (list "S" stream-id)
+                                                      (list "a" artifact-id)
+                                                      (list "j" java-version)
+                                                      (list "g" group-id)
+                                                      (list "b" build-tool)
+                                                      (list "cn" (file-name-nondirectory eglot-java-quarkus-starter-url-projectdef))
+                                                      (list "V" version)))
+                                             "&"))))      
       (url-copy-file source-url dest-file-name t)
       (dired (file-name-directory dest-file-name))
       (revert-buffer))))
