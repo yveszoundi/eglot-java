@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2019-2024 Yves Zoundi
 
-;; Version: 1.28
+;; Version: 1.29
 ;; Author: Yves Zoundi <yves_zoundi@hotmail.com>
 ;; Maintainer: Yves Zoundi <yves_zoundi@hotmail.com>
 ;; URL: https://github.com/yveszoundi/eglot-java
@@ -29,7 +29,7 @@
 ;; Some of the key features include the following:
 ;; - Automatic installation of the Eclipse JDT LSP server (latest milestone release).
 ;; - Ability to pass JVM arguments to the Eclipse JDT LSP server (eglot-java-eclipse-jdt-args)
-;; - Wizards for Spring Starter, Micronaut Launch, Quarkus.io, Maven and Gradle project creation
+;; - Wizards for Spring, Micronaut, Quarkus, Vert.x, Maven and Gradle project creation
 ;; - Generic build command support for Maven and Gradle projects
 ;; - JUnit tests support, this hasn't been tested for a while...
 ;;
@@ -171,37 +171,6 @@
   :type 'file
   :group 'eglot-java)
 
-(defcustom eglot-java-spring-io-excluded-input-params
-  '("_links" "dependencies")
-  "Excluded input parameters."
-  :type '(repeat string)
-  :risky t
-  :group 'eglot-java)
-
-(defcustom eglot-java-spring-starter-url-projectdef
-  "https://start.spring.io"
-  "Start url."
-  :type 'string
-  :group 'eglot-java)
-
-(defcustom eglot-java-micronaut-starter-url-projectdef
-  "https://launch.micronaut.io"
-  "Start url."
-  :type 'string
-  :group 'eglot-java)
-
-(defcustom eglot-java-quarkus-starter-url-projectdef
-  "https://code.quarkus.io"
-  "Start url."
-  :type 'string
-  :group 'eglot-java)
-
-(defcustom eglot-java-spring-starter-url-starterzip
-  "https://start.spring.io/starter.zip"
-  "API endpoint to create a spring boot project."
-  :type 'string
-  :group 'eglot-java)
-
 (defcustom eglot-java-workspace-folder
   (expand-file-name "~")
   "Java projects default folder."
@@ -250,15 +219,23 @@
   :type 'string
   :group 'eglot-java)
 
-(defconst eglot-java-filename-build-maven          "pom.xml"                   "Maven build file name.")
-(defconst eglot-java-filename-build-gradle-groovy  "build.gradle"              "Gradle build file name with Groovy.")
-(defconst eglot-java-filename-build-gradle-kotlin  "build.gradle.kts"          "Gradle build file name with Kotlin.")
-(defconst eglot-java-filename-version-jdtls        ".eglot-java-jdtls-version" "JDT LS version file name.")
-(defconst eglot-java-filename-version-junit        ".eglot-java-junit-version" "JUnit version file name.")
+(defconst eglot-java-filename-build-maven            "pom.xml"                   "Maven build file name.")
+(defconst eglot-java-filename-build-gradle-groovy    "build.gradle"              "Gradle build file name with Groovy.")
+(defconst eglot-java-filename-build-gradle-kotlin    "build.gradle.kts"          "Gradle build file name with Kotlin.")
+(defconst eglot-java-filename-version-jdtls          ".eglot-java-jdtls-version" "JDT LS version file name.")
+(defconst eglot-java-filename-version-junit          ".eglot-java-junit-version" "JUnit version file name.")
+(defconst eglot-java-spring-io-excluded-input-params '("_links" "dependencies") "Excluded spring starter input parameters.")
 
-(defvar eglot-java-spring-starter-jsontext    nil "Spring IO JSON payload.")
-(defvar eglot-java-micronaut-starter-jsontext nil "Micronaut Launch JSON payload.")
-(defvar eglot-java-quarkus-starter-jsontext   nil "Quarkus IO JSON payload.")
+(defvar eglot-java-starterkits-info-by-starterkit-name
+      #s(hash-table test equal
+                    data ("maven"     ()
+                          "gradle"    ()
+                          "spring"    (:url "https://start.spring.io"     :metadata #s(hash-table test equal))
+                          "micronaut" (:url "https://launch.micronaut.io" :metadata #s(hash-table test equal))
+                          "quarkus"   (:url "https://code.quarkus.io"     :metadata #s(hash-table test equal))
+                          "vertx"     (:url "https://start.vertx.io"      :metadata #s(hash-table test equal))))
+      "Starter kits metadata for new project wizards.")
+
 (defvar eglot-java-project-new-directory nil "The newly created java project directory location.")
 (make-variable-buffer-local 'eglot-java-project-new-directory)
 
@@ -811,44 +788,57 @@ debug mode."
                                                         (url-hexify-string (cdr arg))))
                                               (list)
                                               "&")))
-    (message "Downloading spring initializr JSON data...")
+    (message "Downloading JSON data from %s." url)
     (eglot-java--read-json-from-url url)))
 
 (defun eglot-java-project-new ()
   "Create a new Java project."
   (interactive)
-  (let ((project-type (completing-read "Project Type: "
-                                       '("spring" "maven" "gradle" "micronaut" "quarkus")
-                                       nil
-                                       t
-                                       "spring")))
-    (funcall (intern (concat "eglot-java--project-new-" project-type)))))
+  (let* ((project-types                  (hash-table-keys eglot-java-starterkits-info-by-starterkit-name))
+         (project-type                   (completing-read "Project Type: "
+                                                          project-types
+                                                          nil
+                                                          t
+                                                          "spring"))
+         (project-func-name-new          (concat "eglot-java--project-new-" project-type))
+         (project-func-name-startercache (concat "eglot-java--project-startercache-" project-type))
+         (starterkit-info                (gethash project-type eglot-java-starterkits-info-by-starterkit-name)))
+      (when (plist-get starterkit-info :url)
+        (let ((starterkit-url      (plist-get starterkit-info :url))
+              (starterkit-metadata (plist-get starterkit-info :metadata)))
+          (when (hash-table-empty-p starterkit-metadata)
+            (let ((metadata-cache (funcall (intern project-func-name-startercache) starterkit-url)))
+              (maphash (lambda (k v)
+                         (puthash k v starterkit-metadata))
+                       metadata-cache)))))
+    (funcall (intern project-func-name-new))))
 
 (defun eglot-java--project-new-maven ()
   "Create a new Maven project."
-  (let ((mvn-project-parent-dir    (read-directory-name "Enter parent directory: "))
+  (let ((mvn-project-parent-dir    (read-directory-name "Enter parent directory: "))        
         (mvn-group-id              (read-string         "Enter group id: "))
         (mvn-artifact-id           (read-string         "Enter artifact id: "))
         (mvn-archetype-artifact-id (read-string         "Enter archetype artifact id: " "maven-archetype-quickstart")))
-    (let* ((b        (eglot-java--build-run mvn-project-parent-dir
-                                            (eglot-java--build-executable "mvn" "mvnw" mvn-project-parent-dir)
-                                            (concat " archetype:generate "
-                                                    " -DgroupId=" mvn-group-id
-                                                    " -DartifactId=" mvn-artifact-id
-                                                    " -DarchetypeArtifactId=" mvn-archetype-artifact-id
-                                                    " -DinteractiveMode=false")))
-           (dest-dir (expand-file-name mvn-artifact-id mvn-project-parent-dir))
-           (p        (get-buffer-process b)))
-      (with-current-buffer b
-        (setq eglot-java-project-new-directory dest-dir))
-
+    (unless (file-exists-p mvn-project-parent-dir)
+      (make-directory mvn-project-parent-dir t))
+      (let* ((b        (eglot-java--build-run mvn-project-parent-dir
+                                              (eglot-java--build-executable "mvn" "mvnw" mvn-project-parent-dir)
+                                              (concat " archetype:generate "
+                                                      " -DgroupId=" mvn-group-id
+                                                      " -DartifactId=" mvn-artifact-id
+                                                      " -DarchetypeArtifactId=" mvn-archetype-artifact-id
+                                                      " -DinteractiveMode=false")))
+             (dest-dir (expand-file-name mvn-artifact-id mvn-project-parent-dir))
+             (p        (get-buffer-process b)))
+        (with-current-buffer b
+          (setq eglot-java-project-new-directory dest-dir))
       (set-process-sentinel p #'eglot-java--project-new-process-sentinel))))
 
 (defun eglot-java--project-new-gradle ()
   "Create a new Gradle project."
   (let* ((gradle-project-parent-dir (read-directory-name "Enter parent directory:"))
          (gradle-project-name       (read-string         "Enter project name (no spaces): "))
-         (init-dsls                 '("groovy" "kotlin"))
+         (init-dsls                 '("kotlin" "groovy"))
          (init-types                '("java-application" "java-library" "java-gradle-plugin" "basic"))
          (init-test-frameworks      '("junit-jupiter" "spock" "testng"))
          (selected-dsl              (completing-read "Select init DSL: "
@@ -888,8 +878,8 @@ debug mode."
 
       (set-process-sentinel (get-buffer-process b) #'eglot-java--project-new-process-sentinel))))
 
-(defun eglot-java--cache-micronaut-options (root-url)
-  "Cache Micronaut Launcher app settings from an Web location at ROOT-URL."
+(defun eglot-java--project-startercache-micronaut (root-url)
+  "Cache Micronaut project wizard settings from a URL at ROOT-URL."
   (let* ((select-opts-response (eglot-java--get-initializr-json
                                 (concat root-url "/select-options")
                                 "application/json"))
@@ -919,19 +909,18 @@ debug mode."
       ht)))
 
 (defun eglot-java--project-new-micronaut ()
-  "Create a new Micronaut project using Micronaut Launch app."
-  (unless eglot-java-micronaut-starter-jsontext
-    (setq eglot-java-micronaut-starter-jsontext (eglot-java--cache-micronaut-options eglot-java-micronaut-starter-url-projectdef)))
-
-  (let* ((cc eglot-java-micronaut-starter-jsontext)
-         (cc-opts (gethash :options cc))
-         (cc-feats (gethash :features cc))
-         (texts-opts #s(hash-table test equal
-                                   data ("name" (:title "Name" :value "demo")
-                                                "package" (:title "Base Package" :value "com.example"))))
-         (texts (make-hash-table :test 'equal))
-         (selects (make-hash-table :test 'equal))
-         (feats (list)))
+  "Create a new Micronaut project."
+  (let* ((starter-settings   (gethash "micronaut" eglot-java-starterkits-info-by-starterkit-name))
+         (starter-url        (plist-get starter-settings :url))
+         (starter-metadata   (plist-get starter-settings :metadata))
+         (cc-opts            (gethash :options starter-metadata))
+         (cc-feats           (gethash :features starter-metadata))
+         (texts-opts         #s(hash-table test equal
+                                           data ("name" (:title "Name" :value "demo")
+                                                 "package" (:title "Base Package" :value "com.example"))))
+         (texts              (make-hash-table :test 'equal))
+         (selects            (make-hash-table :test 'equal))
+         (feats              (list)))
     (maphash (lambda (k v)
                (puthash k
                         (read-string (format "%s : " (plist-get v :title))
@@ -947,7 +936,6 @@ debug mode."
                                          (plist-get v :default))
                         selects))
              cc-opts)
-
     (let ((featz (gethash (gethash "type" selects) cc-feats)))
       (mapc (lambda (item)
               (add-to-list 'feats (gethash item featz)))
@@ -971,7 +959,7 @@ debug mode."
         (let ((dest-file-name (expand-file-name (concat (format-time-string "%Y-%m-%d_%N") ".zip")
                                                 dest-dir))
               (source-url (format "%s/create/%s/%s?%s"
-                                  eglot-java-micronaut-starter-url-projectdef
+                                  starter-url
                                   app-type
                                   (concat app-pkg
                                           (if (= (length app-pkg) 0)
@@ -986,61 +974,62 @@ debug mode."
           (dired (file-name-directory dest-file-name))
           (revert-buffer))))))
 
+(defun eglot-java--project-startercache-spring (root-url)
+  "Cache Spring project wizard settings from a URL at ROOT-URL."  
+  (eglot-java--get-initializr-json root-url "application/vnd.initializr.v2.2+json"))
+
 (defun eglot-java--project-new-spring ()
-  "Create a new Spring java project using spring initializr. User input parameters are extracted from the JSON structure."
-  (unless eglot-java-spring-starter-jsontext
-    (setq eglot-java-spring-starter-jsontext
-          (eglot-java--get-initializr-json eglot-java-spring-starter-url-projectdef "application/vnd.initializr.v2.2+json")))
-
-  (let* ((elems         (cl-remove-if
-                         (lambda (node-name)
-                           (member node-name eglot-java-spring-io-excluded-input-params))
-                         (hash-table-keys eglot-java-spring-starter-jsontext)))
-         (simple-params (mapcar
-                         (lambda (p)
-                           (let ((elem-type (gethash "type" (gethash p eglot-java-spring-starter-jsontext))))
-                             (cond ((or (string= "single-select" elem-type)
-                                        (string= "action" elem-type))
-                                    (list
-                                     p
-                                     (completing-read
-                                      (format "Select %s: " p)
-                                      (mapcar
-                                       (lambda (f)
-                                         (gethash "id" f))
-                                       (gethash "values" (gethash p
-                                                                  eglot-java-spring-starter-jsontext)))
-                                      nil t (gethash "default" (gethash p
-                                                                        eglot-java-spring-starter-jsontext)))))
-                                   ((string= "text" elem-type)
-                                    (list p
-                                          (read-string (format "Select %s: " p)
-                                                       (gethash "default" (gethash p
-                                                                                   eglot-java-spring-starter-jsontext))))))))
-                         elems))
-         (simple-deps   (completing-read-multiple "Select dependencies (comma separated, TAB to add more): "
-                                                  (apply #'nconc
-                                                         (mapcar
-                                                          (lambda (s)
-                                                            (mapcar
-                                                             (lambda (f)
-                                                               (gethash "id" f))
-                                                             s))
-                                                          (mapcar
-                                                           (lambda (x)
-                                                             (gethash "values" x))
-                                                           (gethash "values"  (gethash "dependencies" eglot-java-spring-starter-jsontext )))))))
-         (dest-dir     (read-directory-name "Project Directory: "
-                                            (expand-file-name (cadr (assoc "artifactId" simple-params)) eglot-java-workspace-folder))))
-
+  "Create a new Spring project."  
+  (let* ((starter-settings  (gethash "spring" eglot-java-starterkits-info-by-starterkit-name))
+         (starter-url       (plist-get starter-settings :url))
+         (starter-metadata  (plist-get starter-settings :metadata))
+         (elems             (cl-remove-if
+                             (lambda (node-name)
+                               (member node-name eglot-java-spring-io-excluded-input-params))
+                             (hash-table-keys starter-metadata)))
+         (simple-params     (mapcar
+                             (lambda (p)
+                               (let ((elem-type (gethash "type" (gethash p starter-metadata))))
+                                 (cond ((or (string= "single-select" elem-type)
+                                            (string= "action" elem-type))
+                                        (list
+                                         p
+                                         (completing-read
+                                          (format "Select %s: " p)
+                                          (mapcar
+                                           (lambda (f)
+                                             (gethash "id" f))
+                                           (gethash "values" (gethash p
+                                                                      starter-metadata)))
+                                          nil t (gethash "default" (gethash p
+                                                                            starter-metadata)))))
+                                       ((string= "text" elem-type)
+                                        (list p
+                                              (read-string (format "Select %s: " p)
+                                                           (gethash "default" (gethash p
+                                                                                       starter-metadata))))))))
+                             elems))
+         (simple-deps       (completing-read-multiple "Select dependencies (comma separated, TAB to add more): "
+                                                      (apply #'nconc
+                                                             (mapcar
+                                                              (lambda (s)
+                                                                (mapcar
+                                                                 (lambda (f)
+                                                                   (gethash "id" f))
+                                                                 s))
+                                                              (mapcar
+                                                               (lambda (x)
+                                                                 (gethash "values" x))
+                                                               (gethash "values"  (gethash "dependencies" starter-metadata )))))))
+         (dest-dir          (read-directory-name "Project Directory: "
+                                                 (expand-file-name (cadr (assoc "artifactId" simple-params)) eglot-java-workspace-folder))))
     (unless (file-exists-p dest-dir)
       (make-directory dest-dir t))
-
     (let ((large-file-warning-threshold nil)
           (dest-file-name (expand-file-name (concat (format-time-string "%Y-%m-%d_%N") ".zip")
                                             dest-dir))
           (source-url     (format "%s?%s"
-                                  eglot-java-spring-starter-url-starterzip
+                                  (format "%s/starter.zip" starter-url)
                                   (url-build-query-string (append simple-params
                                                                   (list
                                                                    (list "dependencies"
@@ -1052,8 +1041,8 @@ debug mode."
       (dired (file-name-directory dest-file-name))
       (revert-buffer))))
 
-(defun eglot-java--cache-quarkus-options (root-url)
-  "Cache Quarkus IO app settings from an Web location at ROOT-URL."
+(defun eglot-java--project-startercache-quarkus (root-url)
+  "Cache Quarkus project wizard settings from a URL at ROOT-URL."
   (let* ((response-streams            (eglot-java--get-initializr-json
                                        (concat root-url "/api/streams") "application/json"))
          (response-extensions         (eglot-java--get-initializr-json
@@ -1075,40 +1064,40 @@ debug mode."
     ret))
 
 (defun eglot-java--project-new-quarkus ()
-  "Create a new Quarkus java project using code.quarkus.io."
-  (unless eglot-java-quarkus-starter-jsontext
-    (setq eglot-java-quarkus-starter-jsontext
-          (eglot-java--cache-quarkus-options eglot-java-quarkus-starter-url-projectdef)))
-  (let* ((metadata-by-quarkus-version      (gethash :metadata-by-quarkus-version eglot-java-quarkus-starter-jsontext))
-         (extension-id-by-name             (gethash :extension-id-by-name eglot-java-quarkus-starter-jsontext))
-         (version                          (read-string "Version: " "1.1.0-SNAPSHOT"))
-         (artifact-id                      (read-string "Artifact: " "code-with-quarkus"))
-         (group-id                         (read-string "Group: " "org.acme"))
-         (build-tool                       (completing-read "Build Tool: "
-                                                            '("MAVEN" "GRADLE_KOTLIN_DSL" "GRADLE")
-                                                            nil
-                                                            t
-                                                            "GRADLE_KOTLIN_DSL"))
-         (quarkus-version                  (completing-read "Quarkus Version: "
-                                                            (hash-table-keys metadata-by-quarkus-version)
-                                                            nil
-                                                            t))
-         (java-version                     (completing-read "Java Version: "
-                                                            (mapcar 'int-to-string
-                                                                    (plist-get (gethash quarkus-version metadata-by-quarkus-version)
-                                                                               :java-versions))
-                                                            nil
-                                                            t))
-         (extension-names                  (completing-read-multiple "Select extensions (comma separated, TAB to add more): "
-                                                                     (hash-table-keys extension-id-by-name)
-                                                                     nil
-                                                                     t))
-         (extension-ids                    (mapcar (lambda (item)
-                                                     (list "e" (gethash item extension-id-by-name)))
-                                                   extension-names))
-         (stream-id                        (plist-get (gethash quarkus-version metadata-by-quarkus-version)
-                                                      :stream-id))         
-         (dest-dir                         (read-directory-name "Project Parent Directory: "
+  "Create a new Quarkus project."  
+  (let* ((starter-settings            (gethash "quarkus" eglot-java-starterkits-info-by-starterkit-name))
+         (starter-url                 (plist-get starter-settings :url))
+         (starter-metadata            (plist-get starter-settings :metadata))
+         (metadata-by-quarkus-version (gethash :metadata-by-quarkus-version starter-metadata))
+         (extension-id-by-name        (gethash :extension-id-by-name starter-metadata))
+         (version                     (read-string "Version: " "1.1.0-SNAPSHOT"))
+         (artifact-id                 (read-string "Artifact: " "code-with-quarkus"))
+         (group-id                    (read-string "Group: " "org.acme"))
+         (build-tool                  (completing-read "Build Tool: "
+                                                       '("MAVEN" "GRADLE_KOTLIN_DSL" "GRADLE")
+                                                       nil
+                                                       t
+                                                       "GRADLE_KOTLIN_DSL"))
+         (quarkus-version             (completing-read "Quarkus Version: "
+                                                       (hash-table-keys metadata-by-quarkus-version)
+                                                       nil
+                                                       t))
+         (java-version                (completing-read "Java Version: "
+                                                       (mapcar 'int-to-string
+                                                               (plist-get (gethash quarkus-version metadata-by-quarkus-version)
+                                                                          :java-versions))
+                                                       nil
+                                                       t))
+         (extension-names             (completing-read-multiple "Select extensions (comma separated, TAB to add more): "
+                                                                (hash-table-keys extension-id-by-name)
+                                                                nil
+                                                                t))
+         (extension-ids               (mapcar (lambda (item)
+                                                (list "e" (gethash item extension-id-by-name)))
+                                              extension-names))
+         (stream-id                   (plist-get (gethash quarkus-version metadata-by-quarkus-version)
+                                                 :stream-id))         
+         (dest-dir                    (read-directory-name "Project Parent Directory: "
                                                                 (expand-file-name eglot-java-workspace-folder))))
     (unless (file-exists-p dest-dir)
       (make-directory dest-dir t))
@@ -1116,7 +1105,7 @@ debug mode."
           (dest-file-name (expand-file-name (concat (format-time-string "%Y-%m-%d_%N") ".zip")
                                             dest-dir))
           (source-url     (format "%s/api/download?%s"
-                                  eglot-java-quarkus-starter-url-projectdef
+                                  starter-url
                                   (mapconcat (lambda (item)
                                                (format "%s=%s" (car item) (cadr item)))                                             
                                              (append extension-ids
@@ -1126,12 +1115,106 @@ debug mode."
                                                       (list "j" java-version)
                                                       (list "g" group-id)
                                                       (list "b" build-tool)
-                                                      (list "cn" (file-name-nondirectory eglot-java-quarkus-starter-url-projectdef))
+                                                      (list "cn" (file-name-nondirectory starter-url))
                                                       (list "V" version)))
                                              "&"))))      
       (url-copy-file source-url dest-file-name t)
       (dired (file-name-directory dest-file-name))
       (revert-buffer))))
+
+(defun eglot-java--project-startercache-vertx (root-url)
+  "Cache Vert.x project wizard settings from a URL at ROOT-URL."
+  (let* ((response-metadata (eglot-java--get-initializr-json
+                             (concat root-url "/metadata") "application/json"))         
+         (ht-defaults       (gethash "defaults" response-metadata))
+         (ht-stack          (make-hash-table :test 'equal))         
+         (ret               (make-hash-table :test 'equal)))
+    (puthash "artifactId"        (list :type :plain-item
+                                       :label "Artifact ID"
+                                       :default (gethash "artifactId" ht-defaults))
+             ret)                
+    (puthash "groupId"           (list :type :plain-item
+                                       :label "Group ID"
+                                       :default (gethash "groupId" ht-defaults))
+             ret)                
+    (puthash "vertxVersion"      (list :type :select-item-basic
+                                       :label   "Vert.x Version"
+                                       :default (gethash "vertxVersion" ht-defaults)
+                                       :options (mapcar (lambda (item)
+                                                          (gethash "number" item))
+                                                        (gethash "versions" response-metadata)))
+             ret)                
+    (puthash "buildTool"         (list :type :select-item-basic
+                                       :label   "Build Tool"
+                                       :default (gethash "buildTool" ht-defaults)
+                                       :options (mapcar #'identity
+                                                        (gethash "buildTools" response-metadata)))
+             ret)                
+    (puthash "language"          (list :type :select-item-basic
+                                       :label   "Language"
+                                       :default (gethash "language" ht-defaults)
+                                       :options (mapcar #'identity
+                                                        (gethash "languages" response-metadata)))
+             ret)
+    (puthash "jdkVersion"        (list :type :select-item-basic
+                                       :label   "JDK Version"
+                                       :default (gethash "jdkVersion" ht-defaults)
+                                       :options (mapcar #'identity
+                                                        (gethash "jdkVersions" response-metadata)))
+             ret)    
+    (dolist (stack-category (gethash "stack" response-metadata))
+      (dolist (stack-item (gethash "items" stack-category))
+        (puthash (gethash "name" stack-item) (gethash "artifactId" stack-item) ht-stack)))
+    (puthash "vertxDependencies" (list :type :select-item-complex
+                                       :label   "Select stacks (comma separated, TAB to add more): "                                  
+                                       :options ht-stack)
+             ret)
+    ret))
+
+(defun eglot-java--project-new-vertx ()
+  "Create a new Vert.x project."  
+  (let* ((starter-settings  (gethash "vertx" eglot-java-starterkits-info-by-starterkit-name))
+         (starter-url       (plist-get starter-settings :url))
+         (starter-metadata  (plist-get starter-settings :metadata))
+         (params            (make-hash-table :test 'equal))
+         (proj-parent-dir   (read-directory-name "Project Parent Directory: "
+                                                 (expand-file-name eglot-java-workspace-folder))))
+    (maphash (lambda (k item)             
+               (let ((item-type (plist-get item :type)))
+                 (cond ((eq item-type :select-item-basic) (puthash k (completing-read (format "%s: " (plist-get item :label))
+                                                                                      (plist-get item :options)
+                                                                                      nil
+                                                                                      t
+                                                                                      (plist-get item :default))
+                                                                   params))
+                       ((eq item-type :select-item-complex) (puthash k
+                                                                     (mapconcat (lambda (elt)
+                                                                                  (gethash elt (plist-get item :options)))
+                                                                                (completing-read-multiple (format "%s: " (plist-get item :label))
+                                                                                                          (hash-table-keys (plist-get item :options))
+                                                                                                          nil
+                                                                                                          t)
+                                                                                ",")
+                                                                     params))
+                       (t (puthash k (read-string (format "%s: " (plist-get item :label)) (plist-get item :default) )
+                                   params)))))
+             starter-metadata)
+    (let ((dest-dir     (expand-file-name (gethash "artifactId" params) proj-parent-dir))
+          (query-params (list)))
+      (unless (file-exists-p dest-dir)
+        (make-directory dest-dir t))      
+      (maphash (lambda (k v)
+                 (add-to-list 'query-params (list k v)))
+               params)
+      (let ((large-file-warning-threshold nil)
+            (dest-file-name (expand-file-name (concat (format-time-string "%Y-%m-%d_%N") ".zip")
+                                              dest-dir))
+            (source-url     (format "%s/starter.zip?%s"
+                                    starter-url
+                                    (url-build-query-string query-params))))
+        (url-copy-file source-url dest-file-name t)
+        (dired (file-name-directory dest-file-name))
+        (revert-buffer)))))
 
 (defun eglot-java--project-new-process-sentinel (process event)
   "Switch to the project directory when the PROCESS finishes with a success EVENT."
