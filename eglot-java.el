@@ -540,6 +540,14 @@ Otherwise the basename of the folder ROOT will be returned."
                                             (json-encode `(("scope" . ,scope)))))
              :classpaths))
 
+(defun eglot-java--buffer-package-name ()
+  "Get the Java package name of the current buffer, or `nil' if it is not
+present."
+  (save-excursion
+    (goto-char (point-min))
+    (when (re-search-forward "^package \\(.+\\);" nil t)
+      (match-string-no-properties 1))))
+
 (defun eglot-java-file-new ()
   "Create a new class."
   (interactive)
@@ -563,7 +571,9 @@ import org.junit.jupiter.api.Test;\n\npublic class %s {\n\n}")))
                                       (plist-get e :displayPath))
                                     source-paths))
          (selected-path     (completing-read "Source path : " display-paths))
-         (fqcn              (read-string "Class name: "))
+         (fqcn              (read-string "Class name: "
+                                         (if-let ((package (eglot-java--buffer-package-name)))
+                                             (concat package "."))))
          (class-type        (when eglot-java-file-new-ask-type
                                 (completing-read "Type: " (hash-table-keys class-by-type))))
          (selected-source   (car (cl-remove-if-not
