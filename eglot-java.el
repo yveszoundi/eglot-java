@@ -219,6 +219,12 @@
   :type 'string
   :group 'eglot-java)
 
+(defcustom eglot-java-file-new-ask-type t
+  "Whether `eglot-java-file-new' asks for the type of new file, or inserts only
+the package name."
+  :type 'boolean
+  :group 'eglot-java)
+
 (defconst eglot-java-filename-build-maven            "pom.xml"                   "Maven build file name.")
 (defconst eglot-java-filename-build-gradle-groovy    "build.gradle"              "Gradle build file name with Groovy.")
 (defconst eglot-java-filename-build-gradle-kotlin    "build.gradle.kts"          "Gradle build file name with Kotlin.")
@@ -534,6 +540,11 @@ Otherwise the basename of the folder ROOT will be returned."
                                             (json-encode `(("scope" . ,scope)))))
              :classpaths))
 
+(defun eglot-java--class-package ()
+  "Get the Java package name of the current buffer, or empty string if it is not
+present."
+  (eglot-java--symbol-name-for-type (eglot-java--document-symbols) "Package"))
+
 (defun eglot-java-file-new ()
   "Create a new class."
   (interactive)
@@ -557,8 +568,12 @@ import org.junit.jupiter.api.Test;\n\npublic class %s {\n\n}")))
                                       (plist-get e :displayPath))
                                     source-paths))
          (selected-path     (completing-read "Source path : " display-paths))
-         (fqcn              (read-string "Class name: "))
-         (class-type        (completing-read "Type: " (hash-table-keys class-by-type)))
+         (fqcn              (read-string "Class name: "
+                                         (let ((package (eglot-java--class-package)))
+                                           (unless (string-empty-p package)
+                                             (concat package ".")))))
+         (class-type        (when eglot-java-file-new-ask-type
+                                (completing-read "Type: " (hash-table-keys class-by-type))))
          (selected-source   (car (cl-remove-if-not
                                   (lambda (e)
                                     (string= (plist-get e :displayPath) selected-path))
@@ -578,8 +593,9 @@ import org.junit.jupiter.api.Test;\n\npublic class %s {\n\n}")))
     (save-buffer)
     (when new-paths
       (insert "package " (mapconcat #'identity new-paths ".") ";\n\n"))
-    (insert (format (gethash class-type class-by-type)
-                    simple-class-name))
+    (when class-type
+      (insert (format (gethash class-type class-by-type)
+                      simple-class-name)))
     (save-buffer)))
 
 (defun eglot-java--do-find-nearest-class-at-point (acc syms idx elt-type cursor-location)
