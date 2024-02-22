@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2019-2024 Yves Zoundi
 
-;; Version: 1.29
+;; Version: 1.30
 ;; Author: Yves Zoundi <yves_zoundi@hotmail.com>
 ;; Maintainer: Yves Zoundi <yves_zoundi@hotmail.com>
 ;; URL: https://github.com/yveszoundi/eglot-java
@@ -540,11 +540,6 @@ Otherwise the basename of the folder ROOT will be returned."
                                             (json-encode `(("scope" . ,scope)))))
              :classpaths))
 
-(defun eglot-java--class-package ()
-  "Get the Java package name of the current buffer, or empty string if it is not
-present."
-  (eglot-java--symbol-name-for-type (eglot-java--document-symbols) "Package"))
-
 (defun eglot-java-file-new ()
   "Create a new class."
   (interactive)
@@ -569,7 +564,7 @@ import org.junit.jupiter.api.Test;\n\npublic class %s {\n\n}")))
                                     source-paths))
          (selected-path     (completing-read "Source path : " display-paths))
          (fqcn              (read-string "Class name: "
-                                         (let ((package (eglot-java--class-package)))
+                                         (let ((package (eglot-java--symbol-name-for-type (eglot-java--document-symbols) "Package")))
                                            (unless (string-empty-p package)
                                              (concat package ".")))))
          (class-type        (when eglot-java-file-new-ask-type
@@ -1026,8 +1021,7 @@ debug mode."
                                                                                        starter-metadata))))))))
                              elems))
          (simple-deps       (completing-read-multiple "Select dependencies (comma separated, TAB to add more): "
-                                                      (apply #'nconc
-                                                             (mapcar
+                                                             (mapcan
                                                               (lambda (s)
                                                                 (mapcar
                                                                  (lambda (f)
@@ -1036,7 +1030,7 @@ debug mode."
                                                               (mapcar
                                                                (lambda (x)
                                                                  (gethash "values" x))
-                                                               (gethash "values"  (gethash "dependencies" starter-metadata )))))))
+                                                               (gethash "values"  (gethash "dependencies" starter-metadata ))))))
          (dest-dir          (read-directory-name "Project Directory: "
                                                  (expand-file-name (cadr (assoc "artifactId" simple-params)) eglot-java-workspace-folder))))
     (unless (file-exists-p dest-dir)
