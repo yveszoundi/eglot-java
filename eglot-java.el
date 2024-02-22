@@ -541,7 +541,7 @@ Otherwise the basename of the folder ROOT will be returned."
              :classpaths))
 
 (defun eglot-java--class-package ()
-  "Get the Java package name of the current buffer, or `nil' if it is not
+  "Get the Java package name of the current buffer, or empty string if it is not
 present."
   (eglot-java--symbol-name-for-type (eglot-java--document-symbols) "Package"))
 
@@ -569,8 +569,9 @@ import org.junit.jupiter.api.Test;\n\npublic class %s {\n\n}")))
                                     source-paths))
          (selected-path     (completing-read "Source path : " display-paths))
          (fqcn              (read-string "Class name: "
-                                         (if-let ((package (eglot-java--class-package)))
-                                             (concat package "."))))
+                                         (let ((package (eglot-java--class-package)))
+                                           (unless (string-empty-p package)
+                                             (concat package ".")))))
          (class-type        (when eglot-java-file-new-ask-type
                                 (completing-read "Type: " (hash-table-keys class-by-type))))
          (selected-source   (car (cl-remove-if-not
