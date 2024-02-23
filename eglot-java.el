@@ -445,7 +445,7 @@ Otherwise returns nil"
 
 (cl-defmethod project-root ((project (head java)))
   "Get the root of a JAVA PROJECT."
-  (cdr project))
+  (project-root project))
 
 (defun eglot-java--find-equinox-launcher ()
   "Find the equinox jar launcher in the LSP plugins directory."
@@ -1252,7 +1252,7 @@ debug mode."
 (defun eglot-java-project-build-refresh ()
   "Build the project when Maven or Gradle build files are found."
   (interactive)
-  (let* ((root       (cdr (project-current)))
+  (let* ((root       (project-root (project-current)))
          (build-file (if (eglot-java--project-gradle-p root)
                          (if (file-exists-p (expand-file-name eglot-java-filename-build-gradle-kotlin root))
                              (expand-file-name eglot-java-filename-build-gradle-kotlin (file-name-as-directory root))
@@ -1271,7 +1271,7 @@ debug mode."
 (defun eglot-java-project-build-task ()
   "Run a new build task."
   (interactive)
-  (let* ((project-dir               (cdr (project-current)))
+  (let* ((project-dir               (project-root (project-current)))
          (goal                      (read-string "Task & Parameters: " "test"))
          (project-is-gradle-project (eglot-java--project-gradle-p project-dir))
          (build-filename            (if project-is-gradle-project
