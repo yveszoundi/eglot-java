@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2019-2024 Yves Zoundi
 
-;; Version: 1.30
+;; Version: 1.31
 ;; Author: Yves Zoundi <yves_zoundi@hotmail.com>
 ;; Maintainer: Yves Zoundi <yves_zoundi@hotmail.com>
 ;; URL: https://github.com/yveszoundi/eglot-java
@@ -1442,7 +1442,7 @@ DESTINATION-DIR is the directory where the LSP server will be installed."
                 (setcdr (assoc eff-existing-java-related-assocs eglot-server-programs) 'eglot-java--eclipse-contact)))
           (add-to-list eglot-server-programs 'java-mode 'eglot-java--eclipse-contact))))
     (unless (member 'eglot-java--project-try project-find-functions)
-      (add-hook 'project-find-functions #'eglot-java--project-try))))
+      (add-to-list 'project-find-functions 'eglot-java--project-try t))))
 
 (defvar eglot-java-mode-map (make-sparse-keymap))
 
