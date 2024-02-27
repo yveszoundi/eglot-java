@@ -315,7 +315,7 @@ ones and overrule settings in the other lists."
                           (:classFileContentsSupport t)
                           :workspaceFolders
                           [,@(cl-delete-duplicates
-                              (mapcar #'eglot--path-to-uri
+                              (mapcar #'eglot-path-to-uri
                                       (let* ((root (project-root (eglot--project server))))
                                         (cons root
                                               (mapcar
@@ -530,13 +530,13 @@ Otherwise the basename of the folder ROOT will be returned."
   (eglot-execute-command
    (eglot--current-server-or-lose)
    "java.project.isTestFile"
-   (vector (eglot--path-to-uri file-path))))
+   (vector (eglot-path-to-uri file-path))))
 
 (defun eglot-java--project-classpath (filename scope)
   "Return the classpath for a given FILENAME and SCOPE."
   (plist-get (eglot-execute-command (eglot--current-server-or-lose)
                                     "java.project.getClasspaths"
-                                    (vector (eglot--path-to-uri filename)
+                                    (vector (eglot-path-to-uri filename)
                                             (json-encode `(("scope" . ,scope)))))
              :classpaths))
 
@@ -790,7 +790,7 @@ debug mode."
   (jsonrpc-request
    (eglot--current-server-or-lose)
    :textDocument/documentSymbol
-   (list :textDocument (list :uri (eglot--path-to-uri (buffer-file-name))))))
+   (list :textDocument (list :uri (eglot-path-to-uri (buffer-file-name))))))
 
 (defun eglot-java--get-initializr-json (url accept-header)
   "Retrieve the Spring initializr JSON model from a given URL and ACCEPT-HEADER."
@@ -1265,7 +1265,7 @@ debug mode."
       (jsonrpc-notify
        (eglot--current-server-or-lose)
        :java/projectConfigurationUpdate
-       (list :uri (eglot--path-to-uri build-file))))
+       (list :uri (eglot-path-to-uri build-file))))
     (jsonrpc-notify
      (eglot--current-server-or-lose)
      :java/buildWorkspace
@@ -1423,9 +1423,6 @@ DESTINATION-DIR is the directory where the LSP server will be installed."
 (defun eglot-java--init ()
   "Initialize the library for use with the Eclipse JDT language server."
   (progn
-    (unless eglot-java-jdt-uri-handling-patch-applied
-      (eglot-java--jdthandler-patch-eglot)
-      (setq eglot-java-jdt-uri-handling-patch-applied t))
     (unless eglot-java-eglot-server-programs-manual-updates
       ;; there are multiple allowed syntaxes for mode associations
       (let ((existing-java-related-assocs (mapcan (lambda (item)
@@ -1472,39 +1469,6 @@ DESTINATION-DIR is the directory where the LSP server will be installed."
 
 (add-to-list 'file-name-handler-alist '("\\`jdt://" . eglot-java--jdt-uri-handler))
 
-(defvar eglot-java-jdt-uri-handling-patch-applied nil "Whether or not JDT uri handling is already patched.")
-
-(defun eglot-java--wrap-legacy-eglot--path-to-uri (original-fn &rest args)
-  "Hack until eglot is updated.
-ARGS is a list with one element, a file path or potentially a URI.
-If path is a jar URI, don't parse. If it is not a jar call ORIGINAL-FN."
-  (let ((path (file-truename (car args))))
-    (if (equal "jdt" (url-type (url-generic-parse-url path)))
-        path
-      (apply original-fn args))))
-
-(defun eglot-java--wrap-legacy-eglot--uri-to-path (original-fn &rest args)
-  "Hack until eglot is updated.
-ARGS is a list with one element, a URI.
-If URI is a jar URI, don't parse and let the `jdthandler--file-name-handler'
-handle it. If it is not a jar call ORIGINAL-FN."
-  (let ((uri (car args)))
-    (if (and (stringp uri)
-             (string= "jdt" (url-type (url-generic-parse-url uri))))
-        uri
-      (apply original-fn args))))
-
-(defun eglot-java--jdthandler-patch-eglot ()
-  "Patch old versions of Eglot to work with Jdthandler."
-  (interactive) ;; TODO Remove when eglot is updated in melpa
-  ;; See also https://debbugs.gnu.org/cgi/bugreport.cgi?bug=58790
-  ;; See also https://git.savannah.gnu.org/gitweb/?p=emacs.git;a=blob;f=lisp/progmodes/eglot.el#l1558
-  (unless (or (and (advice-member-p #'eglot-java--wrap-legacy-eglot--path-to-uri 'eglot--path-to-uri)
-                   (advice-member-p #'eglot-java--wrap-legacy-eglot--uri-to-path 'eglot--uri-to-path))
-              (<= 29 emacs-major-version))
-    (advice-add 'eglot--path-to-uri :around #'eglot-java--wrap-legacy-eglot--path-to-uri)
-    (advice-add 'eglot--uri-to-path :around #'eglot-java--wrap-legacy-eglot--uri-to-path)
-    (message "[eglot-java--jdthandler-patch-eglot] Eglot successfully patched.")))
 
 ;;;###autoload
 (defun eglot-java-upgrade-junit-jar ()
