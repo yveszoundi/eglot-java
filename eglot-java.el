@@ -727,15 +727,18 @@ JVM is started in debug mode."
                    (when debug (concat " " eglot-java-debug-jvm-arg))
                    " "
                    (mapconcat #'identity eglot-java-run-test-jvm-args " ")
-                   " -jar "
-                   "\"" (expand-file-name eglot-java-junit-platform-console-standalone-jar) "\""
-                   " execute "
+                   " -cp "
+                   "\""
+                   (expand-file-name eglot-java-junit-platform-console-standalone-jar)
+                   path-separator
+                   (mapconcat #'expand-file-name cp path-separator)
+                   "\""
+                   " org.junit.platform.console.ConsoleLauncher"
+                   " execute"
                    (if (string-match-p "#" fqcn)
                        " -m "
                      " -c ")
-                   fqcn
-                   " -class-path "
-                   "\"" (mapconcat #'identity cp path-separator) "\"")))
+                   fqcn)))
       (user-error "No test found in current file! Is the file saved?"))))
 
 (defun eglot-java-run-main (debug)
@@ -753,7 +756,7 @@ debug mode."
                    " "
                    (mapconcat #'identity eglot-java-run-main-jvm-args " ")
                    " -cp "
-                   "\"" (mapconcat #'identity cp path-separator) "\""
+                   "\"" (mapconcat #'expand-file-name cp path-separator) "\""
                    " "
                    fqcn
                    " "
