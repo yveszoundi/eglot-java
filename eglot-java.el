@@ -528,13 +528,13 @@ Otherwise the basename of the folder ROOT will be returned."
 (defun eglot-java--file--test-p (file-path)
   "Tell if a file located at FILE-PATH is a test class."
   (eglot-execute-command
-   (eglot--current-server-or-lose)
+   (eglot-java--find-server)
    "java.project.isTestFile"
    (vector (eglot-path-to-uri file-path))))
 
 (defun eglot-java--project-classpath (filename scope)
   "Return the classpath for a given FILENAME and SCOPE."
-  (plist-get (eglot-execute-command (eglot--current-server-or-lose)
+  (plist-get (eglot-execute-command (eglot-java--find-server)
                                     "java.project.getClasspaths"
                                     (vector (eglot-path-to-uri filename)
                                             (json-encode `(("scope" . ,scope)))))
@@ -554,7 +554,7 @@ Otherwise the basename of the folder ROOT will be returned."
                                                   "Test"       "import org.junit.jupiter.api.Assertions;\n
 import org.junit.jupiter.api.Test;\n\npublic class %s {\n\n}")))
          (source-list       (eglot-execute-command
-                             (eglot--current-server-or-lose)
+                             (eglot-java--find-server)
                              "java.project.listSourcePaths" (list)))
          (source-paths      (mapcar
                              #'identity
@@ -788,7 +788,7 @@ debug mode."
 (defun eglot-java--document-symbols ()
   "Fetch the document symbols/tokens."
   (jsonrpc-request
-   (eglot--current-server-or-lose)
+   (eglot-java--find-server)
    :textDocument/documentSymbol
    (list :textDocument (list :uri (eglot-path-to-uri (buffer-file-name))))))
 
@@ -1263,11 +1263,11 @@ debug mode."
                        (expand-file-name eglot-java-filename-build-maven (file-name-as-directory root)))))
     (when (file-exists-p build-file)
       (jsonrpc-notify
-       (eglot--current-server-or-lose)
+       (eglot-java--find-server)
        :java/projectConfigurationUpdate
        (list :uri (eglot-path-to-uri build-file))))
     (jsonrpc-notify
-     (eglot--current-server-or-lose)
+     (eglot-java--find-server)
      :java/buildWorkspace
      (vector :json-false))))
 
@@ -1458,7 +1458,7 @@ DESTINATION-DIR is the directory where the LSP server will be installed."
               (when (string-match "jdt://contents/\\(.*?\\)/\\(.*\\)\.class\\?" uri)
                 (format "%s.java" (replace-regexp-in-string "/" "." (match-string 2 uri) t t))))))))
     (unless (file-readable-p source-file)
-      (let ((content (jsonrpc-request (eglot-current-server) :java/classFileContents (list :uri uri)))
+      (let ((content (jsonrpc-request (eglot-java--find-server) :java/classFileContents (list :uri uri)))
             (metadata-file (format "%s.%s.metadata"
                                    (file-name-directory source-file)
                                    (file-name-base source-file))))
@@ -1469,6 +1469,14 @@ DESTINATION-DIR is the directory where the LSP server will be installed."
 
 (add-to-list 'file-name-handler-alist '("\\`jdt://" . eglot-java--jdt-uri-handler))
 
+(defun eglot-java--find-server ()
+  "Find the LSP server of type eglot-java-eclipse-jdt for the
+current project. In the strange event that there are multiple,
+return the first one."
+  (when-let* ((project (project-current))
+              (servers (gethash project eglot--servers-by-project))
+              (eclipse-jdt-servers (seq-filter #'eglot-java-eclipse-jdt-p servers)))
+    (car eclipse-jdt-servers)))
 
 ;;;###autoload
 (defun eglot-java-upgrade-junit-jar ()
