@@ -727,12 +727,12 @@ JVM is started in debug mode."
                    (when debug (concat " " eglot-java-debug-jvm-arg))
                    " "
                    (mapconcat #'identity eglot-java-run-test-jvm-args " ")
-		   " -cp "
+                   " -cp "
                    "\""
-		   (mapconcat #'identity cp path-separator) path-separator
-		   (expand-file-name eglot-java-junit-platform-console-standalone-jar)
-		   "\""
-		   " org.junit.platform.console.ConsoleLauncher"
+                   (mapconcat #'identity cp path-separator) path-separator
+                   (expand-file-name eglot-java-junit-platform-console-standalone-jar)
+                   "\""
+                   " org.junit.platform.console.ConsoleLauncher"
                    " execute "
                    (if (string-match-p "#" fqcn)
                        " -m "
