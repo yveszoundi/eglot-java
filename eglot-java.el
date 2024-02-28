@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2019-2024 Yves Zoundi
 
-;; Version: 1.31
+;; Version: 1.32
 ;; Author: Yves Zoundi <yves_zoundi@hotmail.com>
 ;; Maintainer: Yves Zoundi <yves_zoundi@hotmail.com>
 ;; URL: https://github.com/yveszoundi/eglot-java
@@ -445,7 +445,7 @@ Otherwise returns nil"
 
 (cl-defmethod project-root ((project (head java)))
   "Get the root of a JAVA PROJECT."
-  (project-root project))
+  (cdr project))
 
 (defun eglot-java--find-equinox-launcher ()
   "Find the equinox jar launcher in the LSP plugins directory."
@@ -645,15 +645,14 @@ CURSOR-LOCATION represents a property list with the line information."
          (package-name (eglot-java--symbol-name-for-type syms "Package"))
          (class-name   (eglot-java--do-find-nearest-class-at-point nil syms 0 "Class" (list :line line-current))))
     (when class-name
-      (let ((method-name (eglot-java--do-find-nearest-method-at-point syms 0 "Method" (list :line line-current))))
-        (when method-name
-          (format "%s%s%s#%s"
-                  package-name
-                  (if (= (length package-name) 0)
-                      ""
-                    ".")
-                  class-name
-                  method-name))))))
+      (when-let ((method-name (eglot-java--do-find-nearest-method-at-point syms 0 "Method" (list :line line-current))))
+        (format "%s%s%s#%s"
+                package-name
+                (if (= (length package-name) 0)
+                    ""
+                  ".")
+                class-name
+                method-name)))))
 
 (defun eglot-java--record-version-info (ver-number dest-file)
   "Store a version VER-NUMBER to a file DEST-FILE."
@@ -817,14 +816,13 @@ debug mode."
          (project-func-name-new          (concat "eglot-java--project-new-" project-type))
          (project-func-name-startercache (concat "eglot-java--project-startercache-" project-type))
          (starterkit-info                (gethash project-type eglot-java-starterkits-info-by-starterkit-name)))
-      (when (plist-get starterkit-info :url)
-        (let ((starterkit-url      (plist-get starterkit-info :url))
-              (starterkit-metadata (plist-get starterkit-info :metadata)))
-          (when (hash-table-empty-p starterkit-metadata)
-            (let ((metadata-cache (funcall (intern project-func-name-startercache) starterkit-url)))
-              (maphash (lambda (k v)
-                         (puthash k v starterkit-metadata))
-                       metadata-cache)))))
+    (when-let ((starterkit-url      (plist-get starterkit-info :url))
+               (starterkit-metadata (plist-get starterkit-info :metadata)))
+      (when (hash-table-empty-p starterkit-metadata)
+        (let ((metadata-cache (funcall (intern project-func-name-startercache) starterkit-url)))
+          (maphash (lambda (k v)
+                     (puthash k v starterkit-metadata))
+                   metadata-cache))))
     (funcall (intern project-func-name-new))))
 
 (defun eglot-java--project-new-maven ()
