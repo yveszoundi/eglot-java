@@ -312,22 +312,24 @@ ones and overrule settings in the other lists."
   "Whether eglot-java modifies the initialisation parameters sent to the server
 to advertise that Eglot can handle requests to rename, delete or create files.
 
-eglot-java overrides `eglot-client-capabilities' and if this variable is non-nil,
-attaches 'workspaceEdit.resourceOperations: [\"create\", \"rename\", \"delete\"]'
-to the advertised client capabilities. `eglot--apply-workspace-edit' is patched
-(advised) by `eglot-java--apply-workspace-edit-around' to handle rename requests
-from the server. Creation or deletion requests are not supported."
+If non-nil, on connect eglot-java will tell JDT that it can handle resource
+operations and patches (advises) certain Eglot functions to handle those
+requests. Only rename requests are handled. Creation or deletion is not
+supported.
+
+See `eglot-client-capabilities' for details, and `eglot-java-rename' for using
+this functionality."
   :type 'boolean
   :group 'eglot-java)
 
 (cl-defmethod eglot-client-capabilities ((server eglot-java-eclipse-jdt))
   "Called when Eglot starts an Eclipse JDT language server.
 When `eglot-java-advertise-resource-operations' is non-nil, attach
-'workspaceEdit.resourceOperations: [\"create\", \"rename\", \"delete\"]' to the
-capabilities advertised by Eglot so that the server will request to rename
-files. Patch (advise) `eglot--apply-workspace-edit' to filter out file operations
-and `eglot--on-shutdown' to clean up our patches.
-Otherwise, do nothing that Eglot itself doesn't do."
+\\='workspaceEdit.resourceOperations: [\"create\", \"rename\", \"delete\"]\\='
+ to the capabilities advertised by Eglot so that the server will request to
+rename files. Patch (advise) `eglot--apply-workspace-edit' to filter out file
+operations and `eglot--on-shutdown' to clean up our patches.  Otherwise, do
+nothing that Eglot itself doesn't do."
   (let ((caps (cl-call-next-method server)))
     (when eglot-java-advertise-resource-operations
       ;; should we require subr.el?
@@ -342,6 +344,10 @@ Otherwise, do nothing that Eglot itself doesn't do."
         (advice-add #'eglot--on-shutdown :after #'eglot-java--cleanup)
         (message "[eglot-java] eglot--apply-workspace-edit patched")))
     caps))
+
+(defvar eglot-java--renaming nil
+  "If non-nil, we are inside `eglot-java-rename'. Offer to rename or create
+files requested by the server.")
 
 (defun eglot-java--apply-workspace-edit-around
     (eglot--apply-workspace-edit wedit origin)
@@ -372,8 +378,10 @@ to Eglot, which cannot handle them. Apply renames we have been called inside
 (defun eglot-java--cleanup (server)
   "When all Eclipse JDT servers have gone away, clean up any advices we may have
 added to Eglot functions."
+  (ignore server) ;; byte-compile
   ;; is map.el in emacs 26??
   (unless (map-some (lambda (k v)
+                      (ignore k)
                       (and (eglot-java-eclipse-jdt-p v)
                            (jsonrpc-running-p v)))
                     eglot--servers-by-project)
@@ -381,15 +389,6 @@ added to Eglot functions."
                    #'eglot-java--apply-workspace-edit-around)
     (advice-remove #'eglot--on-shutdown #'eglot-java--cleanup)
     (message "[eglot-java] No more java servers, patches removed")))
-
-(defun eglot-java--apply-resource-operations (ops)
-  "Dispatch resource operations in OPS based on \"kind\" key to:
-
-+ \"rename\" :: `eglot-java--apply-rename-file'"
-  (dolist (op ops)
-    (pcase (plist-get op :kind)
-      ("rename" (eglot-java--apply-rename-file op))
-      (kind (message "[eglot-java] Ignoring %s operation" kind)))))
 
 (defun eglot-java--apply-rename-file (op)
   "Offer to rename a file that the server has asked us for. If the file already
@@ -418,13 +417,18 @@ exists or a buffer is visiting that file, refuse to clobber the new path."
               (rename-visited-file new-path)
               (eglot--signal-textDocument/didOpen))))))))
 
-(defvar eglot-java--renaming nil
-  "If non-nil, we are inside `eglot-java-rename'. Offer to rename or create
-files requested by the server.")
+(defun eglot-java--apply-resource-operations (ops)
+  "Dispatch resource operations in OPS based on \"kind\" key to:
+
++ \"rename\" :: `eglot-java--apply-rename-file'"
+  (dolist (op ops)
+    (pcase (plist-get op :kind)
+      ("rename" (eglot-java--apply-rename-file op))
+      (kind (message "[eglot-java] Ignoring %s operation" kind)))))
 
 (defun eglot-java-rename ()
-  "Call `eglot-rename' to rename the current symbol. If symbol at point is a Java
-type, offer to rename any files if requested by the server."
+  "Call `eglot-rename' to rename the current symbol. If symbol at point is a
+Java type, offer to rename any files if requested by the server."
   (interactive)
   (let ((eglot-java--renaming t))
     (call-interactively #'eglot-rename)))
