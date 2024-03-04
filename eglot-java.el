@@ -728,9 +728,9 @@ JVM is started in debug mode."
                    (mapconcat #'identity eglot-java-run-test-jvm-args " ")
                    " -cp "
                    "\""
-                   (expand-file-name eglot-java-junit-platform-console-standalone-jar)
-                   path-separator
                    (mapconcat #'expand-file-name cp path-separator)
+                   path-separator
+                   (expand-file-name eglot-java-junit-platform-console-standalone-jar)
                    "\""
                    " org.junit.platform.console.ConsoleLauncher"
                    " execute"
