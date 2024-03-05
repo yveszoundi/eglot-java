@@ -2,6 +2,10 @@
 
 [[https://github.com/yveszoundi/eglot-java/blob/main/LICENSE][file:http://img.shields.io/badge/license-GNU%20GPLv3-blue.svg]] [[https://melpa.org/#/eglot-java][file:https://melpa.org/packages/eglot-java-badge.svg]] [[https://stable.melpa.org/#/eglot-java][file:https://stable.melpa.org/packages/eglot-java-badge.svg]]
 
+All the bugs reports are welcome and appreciated.
+- *Please note that the best way to contribute is via pull requests*.
+- I may not notice immediately when something is broken, as I don't really program professionally anymore.
+  
 * Overview
 
 This package provides additional Java programming language support for [[https://github.com/joaotavora/eglot][eglot]].
@@ -14,7 +18,7 @@ This package provides additional Java programming language support for [[https:/
 |------------------------------------+-----------------------------------------------------------------------------------------+----------|
 | Function                           | Description                                                                             | Autoload |
 |------------------------------------+-----------------------------------------------------------------------------------------+----------|
-| =eglot-java-project-new=           | Create new projects with a wizard ([[https://start.spring.io/][Spring]], [[https://micronaut.io/][Micronaut]], [[https://quarkus.io/][Quarkus]], [[https://vertx.io/][Vert.x]], [[https://maven.apache.org/][Maven]] or [[https://gradle.org/][Gradle]]) | NO       |
+| =eglot-java-project-new=           | Create new projects with a wizard ([[https://start.spring.io/][Spring]], [[https://micronaut.io/][Micronaut]], [[https://quarkus.io/][Quarkus]], [[https://vertx.io/][Vert.x]], [[https://maven.apache.org/][Maven]] or [[https://gradle.org/][Gradle]]) | YES      |
 | =eglot-java-project-build-refresh= | Rebuild the current project                                                             | NO       |
 | =eglot-java-project-build-task=    | Run a build task using [[https://gradle.org/][Gradle]] or [[https://maven.apache.org/][Maven]] for the current project                          | NO       |
 | =eglot-java-file-new=              | Wizard for creating new Java files                                                      | NO       |
@@ -40,7 +44,7 @@ Note: *eglot-java dynamically modifies the eglot-server-programs variable, you c
 
 The =eglot-java= package is available on [[https://melpa.org/#/getting-started][MELPA]].
 
-Once the MELPA repository is configured, please run =M-x package-install= and type =eglot-java=.
+Once the =MELPA= repository is configured, please run =M-x package-install= and type =eglot-java=.
 
 * Usage
 
@@ -81,7 +85,7 @@ Usually this is due to starting the LSP server with an old Java version (see iss
 
 You might want to set the value of =eglot-sync-connect= or =eglot-connect-timeout=.
 - Please consult inspect the relevant variable documentation documentation with =C-h v=.
-- See eglot issues [[https://github.com/joaotavora/eglot/issues/68][#68]] and [[https://github.com/joaotavora/eglot/issues/1342][1342]]
+- See =eglot= issues [[https://github.com/joaotavora/eglot/issues/68][#68]] and [[https://github.com/joaotavora/eglot/issues/1342][#1342]]
 
 ** Gradle projects
 
@@ -102,13 +106,13 @@ The =classFileContentsSupport= capability is registered with some known limitati
   
 ** LSP server upgrades
 
-In early versions of =eglot-java=, the LSP server installation was reflecting the latest available snapshot.
+In earlier versions of =eglot-java=, the LSP server installation was reflecting the latest available snapshot.
 
 As of =eglot-java 1.11= (December 2023), only milestones releases will be installed in order to mitigate challenges with buggy snapshot versions (See issues [[https://github.com/yveszoundi/eglot-java/issues/15][#15]] and [[https://github.com/yveszoundi/eglot-java/issues/16][#16]] for reference).
 
 ** LSP server initialization options
 
-Sometimes you may want to add/modify [[https://github.com/eclipse-jdtls/eclipse.jdt.ls/wiki/Running-the-JAVA-LS-server-from-the-command-line#initialize-request][LSP server initialization settings]].
+Sometimes you may want to add/modify [[https://github.com/eclipse-jdtls/eclipse.jdt.ls/wiki/Running-the-JAVA-LS-server-from-the-command-line#initialize-request][LSP server initialization settings]]. There are tons of them...
 
 - For basic flexibility, you can control the =settings= node of the LSP server configuration via the variable [[https://www.gnu.org/software/emacs/manual/html_node/eglot/User_002dspecific-configuration.html][eglot-workspace-configuration]]. This is best suited for project-specific configuration.
 - For greater flexibility, you can leverage the =eglot-java-user-init-opts-fn= variable
@@ -153,8 +157,5 @@ Please first setup the LSP =:bundles= in custom LSP initializing settings (per p
   - The package is available on [[https://elpa.gnu.org/packages/dape.html][GNU ELPA]] (=M-x package-install=)
   - Utility functions developed by [[https://github.com/MagielBruntink/dape/blob/jdtls-extension/dape-jdtls.el][MagielBruntink]] can be useful
 
-* Contributing
 
-All the bugs reports are welcome and appreciated.
-- *Please note that the best way to contribute is via pull requests*.
-- I may not notice immediately when something is broken, as I don't really write that much Java code anymore.
+
