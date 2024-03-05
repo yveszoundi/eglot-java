@@ -2,8 +2,8 @@
 
 ;; Copyright (C) 2019-2024 Yves Zoundi
 
-;; Version: 1.32
-;; Author: Yves Zoundi <yves_zoundi@hotmail.com>
+;; Version: 1.33
+;; Author: Yves Zoundi <yves_zoundi@hotmail.com> and contributors
 ;; Maintainer: Yves Zoundi <yves_zoundi@hotmail.com>
 ;; URL: https://github.com/yveszoundi/eglot-java
 ;; Keywords: convenience, languages
@@ -33,7 +33,7 @@
 ;; - Generic build command support for Maven and Gradle projects
 ;; - JUnit tests support, this hasn't been tested for a while...
 ;;
-;; eglot-java dynamically modifies  the "eglot-server-programs" variable,
+;; eglot-java dynamically modifies the "eglot-server-programs" variable,
 ;; you can change that behavior with the variable "eglot-java-eglot-server-programs-manual-updates"
 ;; - you may prefer using directly default jdtls Python script, eglot-java doesn't use that (eglot defaults to jdtls)
 ;; - eglot-java calls the relevant Java command directly, both for historical reasons and for potentially avoiding any Python dependency (Windows, Mac OS)
@@ -105,7 +105,8 @@
   :group 'eglot-java)
 
 (defcustom eglot-java-eclipse-jdt-args
-  '("--add-modules=ALL-SYSTEM"
+  '("-Xmx1G"
+    "--add-modules=ALL-SYSTEM"
     "--add-opens"
     "java.base/java.util=ALL-UNNAMED"
     "--add-opens"
@@ -806,30 +807,9 @@ debug mode."
     (message "Downloading JSON data from %s." url)
     (eglot-java--read-json-from-url url)))
 
-(defun eglot-java-project-new ()
-  "Create a new Java project."
-  (interactive)
-  (let* ((project-types                  (hash-table-keys eglot-java-starterkits-info-by-starterkit-name))
-         (project-type                   (completing-read "Project Type: "
-                                                          project-types
-                                                          nil
-                                                          t
-                                                          "spring"))
-         (project-func-name-new          (concat "eglot-java--project-new-" project-type))
-         (project-func-name-startercache (concat "eglot-java--project-startercache-" project-type))
-         (starterkit-info                (gethash project-type eglot-java-starterkits-info-by-starterkit-name)))
-    (when-let ((starterkit-url      (plist-get starterkit-info :url))
-               (starterkit-metadata (plist-get starterkit-info :metadata)))
-      (when (hash-table-empty-p starterkit-metadata)
-        (let ((metadata-cache (funcall (intern project-func-name-startercache) starterkit-url)))
-          (maphash (lambda (k v)
-                     (puthash k v starterkit-metadata))
-                   metadata-cache))))
-    (funcall (intern project-func-name-new))))
-
 (defun eglot-java--project-new-maven ()
   "Create a new Maven project."
-  (let ((mvn-project-parent-dir    (read-directory-name "Enter parent directory: "))        
+  (let ((mvn-project-parent-dir    (read-directory-name "Enter parent directory: "))
         (mvn-group-id              (read-string         "Enter group id: "))
         (mvn-artifact-id           (read-string         "Enter artifact id: "))
         (mvn-archetype-artifact-id (read-string         "Enter archetype artifact id: " "maven-archetype-quickstart")))
@@ -989,11 +969,11 @@ debug mode."
           (revert-buffer))))))
 
 (defun eglot-java--project-startercache-spring (root-url)
-  "Cache Spring project wizard settings from a URL at ROOT-URL."  
+  "Cache Spring project wizard settings from a URL at ROOT-URL."
   (eglot-java--get-initializr-json root-url "application/vnd.initializr.v2.2+json"))
 
 (defun eglot-java--project-new-spring ()
-  "Create a new Spring project."  
+  "Create a new Spring project."
   (let* ((starter-settings  (gethash "spring" eglot-java-starterkits-info-by-starterkit-name))
          (starter-url       (plist-get starter-settings :url))
          (starter-metadata  (plist-get starter-settings :metadata))
@@ -1073,11 +1053,11 @@ debug mode."
             (extension-name (gethash "name" item)))
         (puthash extension-name extension-id extension-id-by-name)))
     (puthash :metadata-by-quarkus-version metadata-by-quarkus-version ret)
-    (puthash :extension-id-by-name extension-id-by-name ret)    
+    (puthash :extension-id-by-name extension-id-by-name ret)
     ret))
 
 (defun eglot-java--project-new-quarkus ()
-  "Create a new Quarkus project."  
+  "Create a new Quarkus project."
   (let* ((starter-settings            (gethash "quarkus" eglot-java-starterkits-info-by-starterkit-name))
          (starter-url                 (plist-get starter-settings :url))
          (starter-metadata            (plist-get starter-settings :metadata))
@@ -1109,7 +1089,7 @@ debug mode."
                                                 (list "e" (gethash item extension-id-by-name)))
                                               extension-names))
          (stream-id                   (plist-get (gethash quarkus-version metadata-by-quarkus-version)
-                                                 :stream-id))         
+                                                 :stream-id))
          (dest-dir                    (read-directory-name "Project Parent Directory: "
                                                                 (expand-file-name eglot-java-workspace-folder))))
     (unless (file-exists-p dest-dir)
@@ -1120,7 +1100,7 @@ debug mode."
           (source-url     (format "%s/api/download?%s"
                                   starter-url
                                   (mapconcat (lambda (item)
-                                               (format "%s=%s" (car item) (cadr item)))                                             
+                                               (format "%s=%s" (car item) (cadr item)))
                                              (append extension-ids
                                                      (list
                                                       (list "S" stream-id)
@@ -1130,7 +1110,7 @@ debug mode."
                                                       (list "b" build-tool)
                                                       (list "cn" (file-name-nondirectory starter-url))
                                                       (list "V" version)))
-                                             "&"))))      
+                                             "&"))))
       (url-copy-file source-url dest-file-name t)
       (dired (file-name-directory dest-file-name))
       (revert-buffer))))
@@ -1138,31 +1118,31 @@ debug mode."
 (defun eglot-java--project-startercache-vertx (root-url)
   "Cache Vert.x project wizard settings from a URL at ROOT-URL."
   (let* ((response-metadata (eglot-java--get-initializr-json
-                             (concat root-url "/metadata") "application/json"))         
+                             (concat root-url "/metadata") "application/json"))
          (ht-defaults       (gethash "defaults" response-metadata))
-         (ht-stack          (make-hash-table :test 'equal))         
+         (ht-stack          (make-hash-table :test 'equal))
          (ret               (make-hash-table :test 'equal)))
     (puthash "artifactId"        (list :type :plain-item
                                        :label "Artifact ID"
                                        :default (gethash "artifactId" ht-defaults))
-             ret)                
+             ret)
     (puthash "groupId"           (list :type :plain-item
                                        :label "Group ID"
                                        :default (gethash "groupId" ht-defaults))
-             ret)                
+             ret)
     (puthash "vertxVersion"      (list :type :select-item-basic
                                        :label   "Vert.x Version"
                                        :default (gethash "vertxVersion" ht-defaults)
                                        :options (mapcar (lambda (item)
                                                           (gethash "number" item))
                                                         (gethash "versions" response-metadata)))
-             ret)                
+             ret)
     (puthash "buildTool"         (list :type :select-item-basic
                                        :label   "Build Tool"
                                        :default (gethash "buildTool" ht-defaults)
                                        :options (mapcar #'identity
                                                         (gethash "buildTools" response-metadata)))
-             ret)                
+             ret)
     (puthash "language"          (list :type :select-item-basic
                                        :label   "Language"
                                        :default (gethash "language" ht-defaults)
@@ -1174,25 +1154,25 @@ debug mode."
                                        :default (gethash "jdkVersion" ht-defaults)
                                        :options (mapcar #'identity
                                                         (gethash "jdkVersions" response-metadata)))
-             ret)    
+             ret)
     (dolist (stack-category (gethash "stack" response-metadata))
       (dolist (stack-item (gethash "items" stack-category))
         (puthash (gethash "name" stack-item) (gethash "artifactId" stack-item) ht-stack)))
     (puthash "vertxDependencies" (list :type :select-item-complex
-                                       :label   "Select stacks (comma separated, TAB to add more): "                                  
+                                       :label   "Select stacks (comma separated, TAB to add more): "
                                        :options ht-stack)
              ret)
     ret))
 
 (defun eglot-java--project-new-vertx ()
-  "Create a new Vert.x project."  
+  "Create a new Vert.x project."
   (let* ((starter-settings  (gethash "vertx" eglot-java-starterkits-info-by-starterkit-name))
          (starter-url       (plist-get starter-settings :url))
          (starter-metadata  (plist-get starter-settings :metadata))
          (params            (make-hash-table :test 'equal))
          (proj-parent-dir   (read-directory-name "Project Parent Directory: "
                                                  (expand-file-name eglot-java-workspace-folder))))
-    (maphash (lambda (k item)             
+    (maphash (lambda (k item)
                (let ((item-type (plist-get item :type)))
                  (cond ((eq item-type :select-item-basic) (puthash k (completing-read (format "%s: " (plist-get item :label))
                                                                                       (plist-get item :options)
@@ -1215,7 +1195,7 @@ debug mode."
     (let ((dest-dir     (expand-file-name (gethash "artifactId" params) proj-parent-dir))
           (query-params (list)))
       (unless (file-exists-p dest-dir)
-        (make-directory dest-dir t))      
+        (make-directory dest-dir t))
       (maphash (lambda (k v)
                  (add-to-list 'query-params (list k v)))
                params)
@@ -1474,9 +1454,30 @@ DESTINATION-DIR is the directory where the LSP server will be installed."
 current project. In the strange event that there are multiple,
 return the first one."
   (when-let* ((project (project-current))
-              (servers (gethash project eglot--servers-by-project))
-              (eclipse-jdt-servers (seq-filter #'eglot-java-eclipse-jdt-p servers)))
-    (car eclipse-jdt-servers)))
+              (servers (gethash project eglot--servers-by-project)))
+    (cl-find-if #'eglot-java-eclipse-jdt-p servers)))
+
+;;;###autoload
+(defun eglot-java-project-new ()
+  "Create a new Java project."
+  (interactive)
+  (let* ((project-types                  (hash-table-keys eglot-java-starterkits-info-by-starterkit-name))
+         (project-type                   (completing-read "Project Type: "
+                                                          project-types
+                                                          nil
+                                                          t
+                                                          "spring"))
+         (project-func-name-new          (concat "eglot-java--project-new-" project-type))
+         (project-func-name-startercache (concat "eglot-java--project-startercache-" project-type))
+         (starterkit-info                (gethash project-type eglot-java-starterkits-info-by-starterkit-name)))
+    (when-let ((starterkit-url      (plist-get starterkit-info :url))
+               (starterkit-metadata (plist-get starterkit-info :metadata)))
+      (when (hash-table-empty-p starterkit-metadata)
+        (let ((metadata-cache (funcall (intern project-func-name-startercache) starterkit-url)))
+          (maphash (lambda (k v)
+                     (puthash k v starterkit-metadata))
+                   metadata-cache))))
+    (funcall (intern project-func-name-new))))
 
 ;;;###autoload
 (defun eglot-java-upgrade-junit-jar ()
