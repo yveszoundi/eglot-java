@@ -28,7 +28,7 @@ This package provides additional Java programming language support for [[https:/
 | =eglot-java-upgrade-junit-jar=     | Upgrade the JUnit jar installation                                                      | YES      |
 |------------------------------------+-----------------------------------------------------------------------------------------+----------|
 
-Note: *eglot-java dynamically modifies the eglot-server-programs variable, you can change that behavior with the variable eglot-java-eglot-server-programs-manual-updates*.
+Note: *eglot-java dynamically modifies the eglot-server-programs variable, you can change that behavior with the variable eglot-java-eglot-server-programs-manual-updates* (See https://github.com/yveszoundi/eglot-java/issues/44).
 - You may prefer using the eglot defaults (=jdtls= Python script), =eglot-java= doesn't use that
 - =eglot-java= calls the relevant Java command directly, both for historical reasons and for potentially avoiding any Python dependency (Windows, Mac OS)
 
