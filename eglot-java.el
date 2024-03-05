@@ -31,7 +31,7 @@
 ;; - Ability to pass JVM arguments to the Eclipse JDT LSP server (eglot-java-eclipse-jdt-args)
 ;; - Wizards for Spring, Micronaut, Quarkus, Vert.x, Maven and Gradle project creation
 ;; - Generic build command support for Maven and Gradle projects
-;; - JUnit tests support, this hasn't been tested for a while...
+;; - Basic JUnit tests support
 ;;
 ;; eglot-java dynamically modifies the "eglot-server-programs" variable,
 ;; you can change that behavior with the variable "eglot-java-eglot-server-programs-manual-updates"
@@ -311,7 +311,6 @@ ones and overrule settings in the other lists."
 
 (cl-defmethod eglot-initialization-options ((server eglot-java-eclipse-jdt))
   "Passes through required jdt initialization options."
-  ;; TODO Allow hooks for settings such as extendedClientCapabilities
   (let ((settings-plist `(:extendedClientCapabilities
                           (:classFileContentsSupport t)
                           :workspaceFolders
