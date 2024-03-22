@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2019-2024 Yves Zoundi
 
-;; Version: 1.33
+;; Version: 1.34
 ;; Author: Yves Zoundi <yves_zoundi@hotmail.com> and contributors
 ;; Maintainer: Yves Zoundi <yves_zoundi@hotmail.com>
 ;; URL: https://github.com/yveszoundi/eglot-java
@@ -114,6 +114,12 @@
   "Eclipse JDT JVM arguments."
   :type '(repeat string)
   :risky t
+  :group 'eglot-java)
+
+(defcustom eglot-java-eclipse-jdt-config-directory
+  nil
+  "Custom folder containing the JDT LS config.ini file to use."
+  :type 'directory
   :group 'eglot-java)
 
 (defcustom eglot-java-java-home
@@ -377,19 +383,21 @@ If INTERACTIVE, prompt user for details."
                     "org.eclipse.jdt.ls.product/target/repository/"))
            (repodir (if (file-directory-p repodir) repodir dir))
            (config
-            (concat
-             repodir
-             (cond
-               ((string= system-type "darwin") "config_mac")
-               ((string= system-type "windows-nt") "config_win")
-               (t "config_linux"))))
+            (if eglot-java-eclipse-jdt-config-directory
+                (file-name-as-directory (expand-file-name eglot-java-eclipse-jdt-config-directory))
+              (concat
+               repodir
+               (cond
+                ((string= system-type "darwin") "config_mac")
+                ((string= system-type "windows-nt") "config_win")
+                (t "config_linux")))))
            (workspace
             (expand-file-name (md5 (project-root (eglot--current-project)))
                               eglot-java-eclipse-jdt-cache-directory)))
       (unless jar
         (setq jar
               (cl-find-if #'is-the-jar
-                          (directory-files (concat repodir "plugins") t))))
+                          (directory-files-recursively repodir "^org.eclipse.equinox.launcher_.*.jar$" t))))
       (unless (and jar (file-exists-p jar) (file-directory-p config))
         (error "Could not find required eclipse.jdt.ls files (build required?)"))
       (when (and interactive (not cp-jar)
@@ -449,17 +457,14 @@ Otherwise returns nil"
 
 (defun eglot-java--find-equinox-launcher ()
   "Find the equinox jar launcher in the LSP plugins directory."
-  (let* ((lsp-java-server-plugins-dir (concat
-                                       (file-name-as-directory
-                                        (expand-file-name eglot-java-server-install-dir))
-                                       "plugins"))
-         (equinox-launcher-jar        (car (directory-files lsp-java-server-plugins-dir
-                                                            nil
-                                                            "^org.eclipse.equinox.launcher_.*.jar$"
-                                                            t))))
+  (let* ((install-dir           (file-name-as-directory
+                                 (expand-file-name eglot-java-server-install-dir)))
+         (equinox-launcher-jar  (car (directory-files-recursively install-dir
+                                                      "^org.eclipse.equinox.launcher_.*.jar$"
+                                                      t))))
     (when (not equinox-launcher-jar)
       (user-error "Could not find Eclipse OSGI jar launcher!"))
-    (expand-file-name equinox-launcher-jar lsp-java-server-plugins-dir)))
+    (expand-file-name equinox-launcher-jar install-dir)))
 
 (defun eglot-java--eclipse-contact (_interactive)
   "Setup the classpath in an INTERACTIVE fashion."
