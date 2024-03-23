@@ -10,13 +10,13 @@ All the bugs reports are welcome and appreciated.
 
 This package provides additional Java programming language support for [[https://github.com/joaotavora/eglot][eglot]].
 - Few convenience functions are available for common operations such as creating a new project or class.
-- There are couple of customization options, including passing custom JVM arguments to the Eclipse JDT language server.
-- The [[https://github.com/eclipse/eclipse.jdt.ls][Eclipse JDT language server]] is automatically installed (if needed) when you open a Java file
+- There are couple of customization options, including passing custom JVM arguments to the =Java= language server.
+- The [[https://github.com/eclipse/eclipse.jdt.ls][Eclipse JDT language server]] is automatically installed (if needed) when you open a =Java= file:
   - This downloads the latest known milestone release
-  - This gives you code completion, refactoring capabilities and other features.
+  - This gives you code completion, refactoring capabilities and other features
 
 |------------------------------------+-----------------------------------------------------------------------------------------+----------|
-| Function                           | Description                                                                             | Autoload |
+| Function                           | Description                                                                             | Auto-load |
 |------------------------------------+-----------------------------------------------------------------------------------------+----------|
 | =eglot-java-project-new=           | Create new projects with a wizard ([[https://start.spring.io/][Spring]], [[https://micronaut.io/][Micronaut]], [[https://quarkus.io/][Quarkus]], [[https://vertx.io/][Vert.x]], [[https://maven.apache.org/][Maven]] or [[https://gradle.org/][Gradle]]) | YES      |
 | =eglot-java-project-build-refresh= | Rebuild the current project                                                             | NO       |
@@ -36,9 +36,9 @@ Note: *eglot-java dynamically modifies the eglot-server-programs variable, you c
 
 - The only *direct* Emacs package dependency is [[https://github.com/joaotavora/eglot][eglot]], assuming you're running a recent Emacs version.
 - The [[https://projects.eclipse.org/projects/eclipse.jdt.ls/downloads][Eclipse JDT Language server]] along with the [[https://mvnrepository.com/artifact/org.junit.platform/junit-platform-console-standalone][JUnit console runner]] are configured to be *automatically installed* when not found at default locations (see =M-x customize-group= /eglot-java/).
-  - The Eclipse JDT.LS team mentions that there's support for [[https://github.com/eclipse/eclipse.jdt.ls#features][compiling projects from Java 1.5 through 16]], but you're encouraged to use recent versions of the Java Development Toolkit ([[https://www.oracle.com/java/technologies/downloads/][JDK]]).
-  - This extension has been tested with recent Java and Eclipse JDT snapshot versions for few years (since roughly mid-2018).
-- Please also configure your *[[https://www.java.com/en/download/help/path.html][PATH]]* environment variable [[https://www.tutorialspoint.com/maven/maven_environment_setup.htm][for Maven]] and/or [[https://docs.gradle.org/current/userguide/installation.html][for Gradle]]. Gradle LSP support doesn't seem that mature compared to Maven overall (LSP server errors or other intermittent issues).
+  - The Eclipse JDT.LS server has [[https://github.com/eclipse-jdtls/eclipse.jdt.ls#features][several features]], and it's recommended that you use a recent enough version of the Java Development Toolkit ([[https://www.oracle.com/java/technologies/downloads/][JDK]]).
+  - This emacs package has been tested for few years (roughly since mid-2018).
+- Please also configure your *[[https://www.java.com/en/download/help/path.html][PATH]]* environment variable [[https://www.tutorialspoint.com/maven/maven_environment_setup.htm][for Maven]] and/or [[https://docs.gradle.org/current/userguide/installation.html][for Gradle]]. =Gradle= support isn't that mature compared to =Maven= overall (Maven has been around much longer...).
 
 * Installation
 
@@ -52,7 +52,7 @@ Once the =MELPA= repository is configured, please run =M-x package-install= and 
 
 You can configure few settings to reflect your preferences via =M-x customize-group= (/eglot-java/):
 - You can set the default LSP server installation folder, etc.
-- You can specify JVM arguments for the LSP server (=eglot-java-eclipse-jdt-args= variable).
+- You can specify =JVM= arguments for the LSP server (=eglot-java-eclipse-jdt-args= variable).
 - You can control eglot initialization of LSP server settings through the =eglot-java-user-init-options= variable. Its value will be merged with defaults (e.g., specifying code formatting profiles, etc.).
 - etc.
 
@@ -77,9 +77,9 @@ Below is a sample minimal configuration, without any fancy library such as =use-
 
 ** LSP server startup errors
 
-Usually this is due to starting the LSP server with an old Java version (see issue [[https://github.com/yveszoundi/eglot-java/issues/29][#29]]).
-- Please ensure that your JVM version meets the [[https://github.com/eclipse-jdtls/eclipse.jdt.ls#requirements][compatibility requirements]] for the [[https://projects.eclipse.org/projects/eclipse.jdt.ls][Eclipse JDT LS server]].
-- As of early 2024, you need to start the LSP server with =JDK 17= or later.
+Usually this is due to starting the =LSP= server with an old Java version (see issue [[https://github.com/yveszoundi/eglot-java/issues/29][#29]]).
+- Please ensure that your =JVM= version meets the [[https://github.com/eclipse-jdtls/eclipse.jdt.ls#requirements][compatibility requirements]] for the [[https://projects.eclipse.org/projects/eclipse.jdt.ls][Eclipse JDT.LS server]].
+- As of early 2024, you need to start the =LSP= server with =JDK 17= or later.
 
 ** Intermittent eglot timeout errors
 
@@ -91,7 +91,7 @@ You might want to set the value of =eglot-sync-connect= or =eglot-connect-timeou
 
 If you have issues with [[https://gradle.org/][Gradle projects]] (code completion not working), then it's likely due to [[https://docs.gradle.org/current/userguide/compatibility.html][version incompatibilities]] (JDK and bundled Gradle Eclipse versions):
 - The safe approach is to always rely on the Gradle wrapper, accordingly to the [[https://docs.gradle.org/current/userguide/compatibility.html][Gradle compatibility matrix]]
-- As of December 2022, the latest Eclipse JDT LS would include the [[https://github.com/eclipse/eclipse.jdt.ls/blob/master/org.eclipse.jdt.ls.target/org.eclipse.jdt.ls.tp.target#L14][buildship plugin version 3.17.x]] for Gradle support
+- As of December 2022, the latest Eclipse JDT.LS would include the [[https://github.com/eclipse/eclipse.jdt.ls/blob/master/org.eclipse.jdt.ls.target/org.eclipse.jdt.ls.tp.target#L14][buildship plugin version 3.17.x]] for Gradle support
 - For version =3.17.x= that [[https://github.com/eclipse/buildship/blob/master/org.gradle.toolingapi/META-INF/MANIFEST.MF][translates into Gradle 7.4.2 or later]]
 - =Gradle 7.4.2= would not be compatible with let's say =JDK 19=, the user would need [[https://docs.gradle.org/current/userguide/compatibility.html][Gradle 7.6]], thus why it's best to always use/generate the Gradle wrapper for peace of mind
 
@@ -117,7 +117,7 @@ Sometimes you may want to add/modify [[https://github.com/eclipse-jdtls/eclipse.
 - For basic flexibility, you can control the =settings= node of the LSP server configuration via the variable [[https://www.gnu.org/software/emacs/manual/html_node/eglot/User_002dspecific-configuration.html][eglot-workspace-configuration]]. This is best suited for project-specific configuration.
 - For greater flexibility, you can leverage the =eglot-java-user-init-opts-fn= variable
   - You'll need to bind the value of =eglot-java-user-init-opts-fn= with your own callback function
-  - You'll need to return a [[https://www.gnu.org/software/emacs/manual/html_node/elisp/Property-Lists.html][property list]] of valid JDT LS settings (merged with defaults):
+  - You'll need to return a [[https://www.gnu.org/software/emacs/manual/html_node/elisp/Property-Lists.html][property list]] of valid JDT.LS settings (merged with defaults):
     - In =eglot= keys (property names) are keywords symbols (e.g., =:key=)
     - Instead of curly braces in JSON, you use nested parenthesis (e.g., =(:java (:home "/usr/share/jdk21"))=)
     - For boolean values, use =t= for "true" and =:json-false= for "false"
@@ -136,11 +136,11 @@ In the example below, the Google style of formatting is configured for later inv
          :enabled t)))))
 #+end_src
 
-The list of LSP server settings is available in the [[https://github.com/eclipse-jdtls/eclipse.jdt.ls/wiki][Eclipse JDT LS wiki]] on GitHub:
+The list of LSP server settings is available in the [[https://github.com/eclipse-jdtls/eclipse.jdt.ls/wiki][Eclipse JDT.LS wiki]] on GitHub:
 - [[https://github.com/eclipse-jdtls/eclipse.jdt.ls/wiki/Language-Server-Settings-&-Capabilities][General summary and list of extended capabilities]]
 - [[https://github.com/eclipse-jdtls/eclipse.jdt.ls/wiki/Running-the-JAVA-LS-server-from-the-command-line#initialize-request][Available settings (names and data types)]]
 
-Per general Eclipse JDT LS documentation, a basic skeleton of an initialization customization could look as follow:
+Per general Eclipse JDT.LS documentation, a basic skeleton of an initialization customization could look as follow:
 
 #+begin_src emacs-lisp
   '(:bundles: ["/home/me/.emacs.d/lsp-bundles/com.microsoft.java.debug.plugin-0.50.0.jar"]
