@@ -157,5 +157,15 @@ Please first setup the LSP =:bundles= in custom LSP initializing settings (per p
   - The package is available on [[https://elpa.gnu.org/packages/dape.html][GNU ELPA]] (=M-x package-install=)
   - Utility functions developed by [[https://github.com/MagielBruntink/dape/blob/jdtls-extension/dape-jdtls.el][MagielBruntink]] can be useful
 
+** Systems such as NixOS or Gnu Guix
+
+While =eglot-java= offers few auto-configuration settings for user convenience, this can be challenging for [[https://nixos.org/][NixOS]] or [[https://guix.gnu.org/][Gnu Guix]] users.
+
+There are couple of variables that you can customize (=M-x customize-variable=):
+- You can set a fixed location for the =LSP= installation folder (=eglot-java-server-install-dir=)
+- You can define additional JVM parameters to avoid read-only file system errors (=eglot-java-eclipse-jdt-args=)
+- You can configure the folder containing the server =config.ini= file (=eglot-java-eclipse-jdt-config-directory=)
+
+Please also see [[https://github.com/yveszoundi/eglot-java/issues/46#issuecomment-2016032963][issue #46]].
 
 
