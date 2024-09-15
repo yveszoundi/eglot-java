@@ -1437,7 +1437,7 @@ DESTINATION-DIR is the directory where the LSP server will be installed."
 (defun eglot-java--jdt-uri-handler (_operation &rest args)
   "Support Eclipse jdtls `jdt://' uri scheme."
   (let* ((uri (car args))
-         (cache-dir (expand-file-name ".eglot-java" (temporary-file-directory)))
+         (cache-dir (expand-file-name ".eglot-java" (project-root (project-current t))))
          (source-file
           (expand-file-name
            (eglot-java--make-path
