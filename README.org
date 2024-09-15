@@ -143,9 +143,9 @@ The list of LSP server settings is available in the [[https://github.com/eclipse
 Per general Eclipse JDT.LS documentation, a basic skeleton of an initialization customization could look as follow:
 
 #+begin_src emacs-lisp
-  '(:bundles: ["/home/me/.emacs.d/lsp-bundles/com.microsoft.java.debug.plugin-0.50.0.jar"]
-    :workspaceFolders: ["file:///home/me/Projects/mavenproject"]
-    :settings: (:java (:home "/usr/local/jdk21"))
+  '(:bundles ["/home/me/.emacs.d/lsp-bundles/com.microsoft.java.debug.plugin-0.50.0.jar"]
+    :workspaceFolders ["file:///home/me/Projects/mavenproject"]
+    :settings (:java (:home "/usr/local/jdk21"))
     :extendedClientCapabilities (:classFileContentsSupport t))
 #+end_src
 
